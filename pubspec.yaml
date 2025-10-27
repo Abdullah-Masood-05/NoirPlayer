@@ -30,6 +30,14 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  just_audio: ^0.10.4
+  audio_service: ^0.18.18
+  on_audio_query: ^2.9.0
+  permission_handler: ^12.0.1
+  provider: ^6.1.2
+  shared_preferences: ^2.5.3
+  audio_session: ^0.1.7
+  rxdart: ^0.27.7
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -38,6 +46,14 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+
+
+dependency_overrides:
+  on_audio_query_android:
+    git:
+      url: https://github.com/LucJosin/on_audio_query.git
+      path: packages/on_audio_query_android
+
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
