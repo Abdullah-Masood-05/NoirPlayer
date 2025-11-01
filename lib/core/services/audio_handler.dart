@@ -1,65 +1,75 @@
+
+
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
 
-late final AudioHandler audioHandler;
+late final AudioHandler audioHandler; // ✅ Global instance
 
 Future<void> initAudioService() async {
-  audioHandler = await AudioService.init(
-    builder: () => AudioPlayerHandler(),
-    config: const AudioServiceConfig(
-      androidNotificationChannelId: 'com.example.noir_player.channel.audio',
-      androidNotificationChannelName: 'Noir Player',
-      androidNotificationOngoing: true,
-    ),
-  );
+  try {
+    audioHandler = await AudioService.init(
+      builder: () => AudioPlayerHandler(),
+      config: const AudioServiceConfig(
+        androidNotificationChannelId: 'com.example.noir_player.channel.audio',
+        androidNotificationChannelName: 'Noir Player',
+        androidNotificationOngoing: true,
+      ),
+    );
+    print( 'AudioService initialized successfully.');
+  } catch (e) {
+    print('Error initializing AudioService: $e');
+  }
 }
+// Create a MediaItem to represent the current song.
 
-class AudioPlayerHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
+
+
+class AudioPlayerHandler extends BaseAudioHandler {
   final _player = AudioPlayer();
 
   AudioPlayerHandler() {
-    _player.playbackEventStream.listen((event) {
-      playbackState.add(playbackState.value.copyWith(
-        playing: _player.playing,
-        controls: [
-          MediaControl.skipToPrevious,
-          _player.playing ? MediaControl.pause : MediaControl.play,
-          MediaControl.skipToNext,
-        ],
-        processingState: const {
-          ProcessingState.idle: AudioProcessingState.idle,
-          ProcessingState.loading: AudioProcessingState.loading,
-          ProcessingState.ready: AudioProcessingState.ready,
-          ProcessingState.completed: AudioProcessingState.completed,
-        }[_player.processingState]!,
-      ));
+    // Keep media item and playback state updated
+    _player.playerStateStream.listen((state) {
+      playbackState.add(
+        PlaybackState(
+          playing: state.playing,
+          processingState: _mapState(state.processingState),
+        ),
+      );
     });
   }
 
-  @override
-  Future<void> playMediaItem(MediaItem item) async {
-    mediaItem.add(item);
-    await _player.setAudioSource(AudioSource.uri(Uri.parse(item.id)));
-    play();
+  Future<void> playSong(String uri) async {
+    try {
+      final item = MediaItem(
+        id: uri,
+        title: uri.split('/').last,
+      );
+      mediaItem.add(item);
+      await _player.setUrl(uri);
+      await _player.play();
+      print('Playing song: $uri');
+      return;
+      
+    } catch (e) {
+      print('Error playing song: $e');
+    }
   }
 
-  @override
-  Future<void> play() => _player.play();
-
-  @override
-  Future<void> pause() => _player.pause();
-
-  @override
-  Future<void> skipToNext() async {
-    // Implement later for playlists
+  AudioProcessingState _mapState(ProcessingState state) {
+    switch (state) {
+      case ProcessingState.idle:
+        return AudioProcessingState.idle;
+      case ProcessingState.loading:
+        return AudioProcessingState.loading;
+      case ProcessingState.buffering:
+        return AudioProcessingState.buffering;
+      case ProcessingState.ready:
+        return AudioProcessingState.ready;
+      case ProcessingState.completed:
+        return AudioProcessingState.completed;
+    }
   }
-
-  @override
-  Future<void> skipToPrevious() async {
-    // Implement later for playlists
-  }
-
-  @override
-  Future<void> stop() => _player.stop();
-}
   
+}
+

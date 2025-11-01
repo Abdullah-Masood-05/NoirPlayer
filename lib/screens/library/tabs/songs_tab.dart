@@ -1,3 +1,4 @@
+//import 'package:audio_service/audio_service.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:noir_player/core/services/audio_handler.dart';
@@ -27,12 +28,16 @@ class _SongsTabState extends State<SongsTab> {
     if (await Permission.audio.isGranted ||
         await Permission.storage.isGranted) {
       _loadSongs();
+
       return;
     }
 
     // ✅ Android 13+ uses READ_MEDIA_AUDIO instead of storage
     if (await Permission.audio.request().isGranted ||
         await Permission.storage.request().isGranted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('loaded all songs.')));
       _loadSongs();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -108,16 +113,30 @@ class _SongsTabState extends State<SongsTab> {
                           style: const TextStyle(color: Colors.white60),
                         ),
                         onTap: () async {
-                          final song = _songs[index];
-                          await audioHandler.playMediaItem(
-                            MediaItem(
-                              id: song.uri ?? '',
-                              title: song.title,
-                              artist: song.artist ?? 'Unknown Artist',
-                              album: song.album ?? 'Unknown Album',
-                              duration: song.duration != null ? Duration(milliseconds: song.duration!) : null,
-                            ),
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Played the songs.')),
                           );
+                          // if (!AudioService.running) {
+                          //   ScaffoldMessenger.of(context).showSnackBar(
+                          //     const SnackBar(
+                          //       content: Text(
+                          //         'Audio service is not initialized yet.',
+                          //       ),
+                          //     ),
+                          //   );
+                          //   return;
+                          // }
+                          //Navigator.pushNamed(context, '/player');
+                          await AudioPlayerHandler().playSong(song.data);
+
+                          //await audioHandler.playSong(song.data);
+                          // await (audioHandler as AudioPlayerHandler).playSong(
+                          //   song.data,
+                          // );
+                          if (mounted) {
+                            // Navigate to the player screen
+                            Navigator.pushNamed(context, '/player');
+                          }
                         },
                       );
                     },
