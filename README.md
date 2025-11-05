@@ -1,7 +1,7 @@
 # Noir Player
 
 > **Noir Player** is a lightweight Flutter music player that demonstrates how to:
-> - Initialise the Android/iOS audio service with background playback support  
+> - Initialise the Android audio service with background playback support  
 > - Query the device’s media library using **`on_audio_query`**  
 > - Play, pause, stop and show the current media item in a dedicated “Now Playing” screen  
 > - Keep the UI responsive with `StreamBuilder`s  
@@ -87,8 +87,6 @@ lib/
 | Platform | Requirement |
 |----------|-------------|
 | Android | Flutter SDK ≥ 2.18, Android 6.0+ |
-| iOS | Flutter SDK, Xcode (>= 14) |
-| Windows/macOS | (Optional) Flutter Desktop support |
 
 - Make sure you have a recent version of **Flutter** installed:
   ```bash
@@ -110,10 +108,6 @@ flutter pub get
 ```bash
 # Android
 flutter run -d android
-
-# iOS (requires a macOS machine)
-flutter run -d ios
-```
 
 > On first launch, the app will request permission to read the device’s music library.  
 > Grant the permission and the library will populate automatically.
