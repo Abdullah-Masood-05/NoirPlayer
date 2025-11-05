@@ -290,10 +290,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
 Pull requests are welcome!  
 Please open an issue first to discuss any major changes or new features.
 
-### Code of Conduct
-
-This project follows the standard [Contributor Covenant](CODE_OF_CONDUCT.md).
-
 ---
 
 ## 📄 License
