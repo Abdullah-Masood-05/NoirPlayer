@@ -63,16 +63,28 @@ lib/
 ├── core/
 │   └── services/
 │       └── audio_handler.dart
+│   └── theme/
+│       └── app_theme.dart
 ├── screens/
 │   ├── home/
 │   │   └── home_screen.dart
 │   ├── library/
+│   │   └── tabs/
+│   │       └── albums_tab.dart
+│   │       └── artists_tab.dart
+│   │       └── playlists_tab.dart
+│   │       └── songs_tab.dart
 │   │   └── library_screen.dart
-│   └── player/
-│       └── player_screen.dart
+│   ├── player/
+│   │   └── player_screen.dart
+│   ├── playlists/
+│   │   └── playlists_screen.dart
+│   └── settings/
+│       └── settings_screen.dart
 ├── widgets/
 │   └── query_artwork_widget.dart
 └── ...
+
 
 ```
 
