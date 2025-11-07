@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:noir_player/core/services/audio_handler.dart';
 import 'package:noir_player/screens/player/player_screen.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -12,6 +13,7 @@ import 'screens/home/home_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initAudioService();
+  timeDilation = 1.0;
   runApp(const NoirPlayerApp());
 }
 
