@@ -209,7 +209,7 @@ class _LibraryScreenState extends State<LibraryScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Library'),
+        // title: const Text('Library'),
         centerTitle: true,
         bottom: TabBar(
           controller: _tabController,
