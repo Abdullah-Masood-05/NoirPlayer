@@ -123,8 +123,8 @@ flutter run -d android
 
 > On first launch, the app will request permission to read the device’s music library.  
 > Grant the permission and the library will populate automatically.
+```
 
----
 
 ## 🧭 Workflow
 
@@ -207,7 +207,7 @@ class NoirPlayerApp extends StatelessWidget {
     );
   }
 }
-```
+
 
 *Bootstraps the app, initialises the audio service in `main()` and defines the navigation routes.*
 
