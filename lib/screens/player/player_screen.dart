@@ -104,9 +104,6 @@
 //   }
 // }
 
-
-
-
 // import 'package:audio_service/audio_service.dart';
 // import 'package:flutter/material.dart';
 // import 'package:just_audio/just_audio.dart';
@@ -161,13 +158,11 @@
 //   Stream<PlayerState>? get playerStateStream => null;
 // }
 
-
-
-
-
-
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
+import 'package:just_audio/just_audio.dart'; // For audio playback
+import 'package:on_audio_query/on_audio_query.dart';
+import 'dart:typed_data';
 import '../../core/services/audio_handler.dart';
 
 class PlayerScreen extends StatefulWidget {
@@ -178,6 +173,17 @@ class PlayerScreen extends StatefulWidget {
 }
 
 class _PlayerScreenState extends State<PlayerScreen> {
+  final OnAudioQuery _audioQuery = OnAudioQuery();
+
+  Future<Uint8List?> _loadArtwork(int songId) async {
+    return await _audioQuery.queryArtwork(
+      songId,
+      ArtworkType.AUDIO,
+      format: ArtworkFormat.JPEG,
+      size: 800, // Request a large image
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -200,33 +206,73 @@ class _PlayerScreenState extends State<PlayerScreen> {
             );
           }
 
+          final songId = int.tryParse(mediaItem.id);
+
           return Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // 🎵 Album Art Placeholder
-                Container(
-                  width: 220,
-                  height: 220,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[800],
-                    borderRadius: BorderRadius.circular(16),
-                    image: mediaItem.artUri != null
-                        ? DecorationImage(
-                            image: NetworkImage(mediaItem.artUri.toString()),
+                // 🎵 Album Art
+                if (songId != null)
+                  FutureBuilder<Uint8List?>(
+                    future: _loadArtwork(songId),
+                    builder: (context, artSnapshot) {
+                      if (artSnapshot.connectionState ==
+                          ConnectionState.waiting) {
+                        return Container(
+                          width: 300,
+                          height: 300,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[800],
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Center(
+                            child: CircularProgressIndicator(),
+                          ),
+                        );
+                      }
+                      if (artSnapshot.hasData && artSnapshot.data != null) {
+                        return ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Image.memory(
+                            artSnapshot.data!,
+                            width: 300,
+                            height: 300,
                             fit: BoxFit.cover,
-                          )
-                        : null,
-                  ),
-                  child: mediaItem.artUri == null
-                      ? const Icon(
+                          ),
+                        );
+                      }
+                      // Fallback if no artwork
+                      return Container(
+                        width: 300,
+                        height: 300,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[800],
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Icon(
                           Icons.music_note,
-                          size: 80,
+                          size: 100,
                           color: Colors.white54,
-                        )
-                      : null,
-                ),
+                        ),
+                      );
+                    },
+                  )
+                else
+                  Container(
+                    width: 300,
+                    height: 300,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[800],
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(
+                      Icons.music_note,
+                      size: 100,
+                      color: Colors.white54,
+                    ),
+                  ),
                 const SizedBox(height: 40),
 
                 // 🎵 Song Title
@@ -364,26 +410,26 @@ class _PlayerScreenState extends State<PlayerScreen> {
 //                 ClipRRect(
 //                   borderRadius: BorderRadius.circular(16),
 //                   child: songId != null
-//                       ? QueryArtworkWidget(
-//                           id: songId,
-//                           type: ArtworkType.AUDIO,
-//                           size: 220,
-//                           quality: 100,
-//                           artworkBorder: BorderRadius.circular(16),
-//                           nullArtworkWidget: Container(
-//                             width: 220,
-//                             height: 100,
-//                             decoration: BoxDecoration(
-//                               color: Colors.grey[800],
-//                               borderRadius: BorderRadius.circular(16),
-//                             ),
-//                             child: const Icon(
-//                               Icons.music_note,
-//                               size: 180,
-//                               color: Colors.white54,
-//                             ),
-//                           ),
-//                         )
+                      // ? QueryArtworkWidget(
+                      //     id: songId,
+                      //     type: ArtworkType.AUDIO,
+                      //     size: 220,
+                      //     quality: 100,
+                      //     artworkBorder: BorderRadius.circular(16),
+                      //     nullArtworkWidget: Container(
+                      //       width: 220,
+                      //       height: 100,
+                      //       decoration: BoxDecoration(
+                      //         color: Colors.grey[800],
+                      //         borderRadius: BorderRadius.circular(16),
+                      //       ),
+                      //       child: const Icon(
+                      //         Icons.music_note,
+                      //         size: 180,
+                      //         color: Colors.white54,
+                      //       ),
+                      //     ),
+                      //   )
 //                       : Container(
 //                           width: 220,
 //                           height: 100,
