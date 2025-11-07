@@ -665,6 +665,110 @@
 //   }
 // }
 
+// import 'package:audio_service/audio_service.dart';
+// import 'package:flutter/material.dart';
+// import 'package:noir_player/core/services/audio_handler.dart';
+// import 'package:on_audio_query/on_audio_query.dart';
+// import 'package:permission_handler/permission_handler.dart';
+
+// class SongsTab extends StatefulWidget {
+//   // ✅ Add callback parameter
+//   final VoidCallback onNavigateToPlayer;
+
+//   const SongsTab({super.key, required this.onNavigateToPlayer});
+
+//   @override
+//   State<SongsTab> createState() => _SongsTabState();
+// }
+
+// class _SongsTabState extends State<SongsTab> {
+//   final OnAudioQuery _audioQuery = OnAudioQuery();
+//   List<SongModel> _songs = [];
+//   String _searchText = '';
+
+//   @override
+//   void initState() {
+//     super.initState();
+//     _requestPermissionAndLoad();
+//   }
+
+//   Future<void> _requestPermissionAndLoad() async {
+//     if (await Permission.audio.isGranted ||
+//         await Permission.storage.isGranted) {
+//       _loadSongs();
+//       return;
+//     }
+
+//     if (await Permission.audio.request().isGranted ||
+//         await Permission.storage.request().isGranted) {
+//       if (mounted) {
+//         ScaffoldMessenger.of(
+//           context,
+//         ).showSnackBar(const SnackBar(content: Text('Loaded all songs.')));
+//       }
+//       _loadSongs();
+//     } else {
+//       if (mounted) {
+//         ScaffoldMessenger.of(context).showSnackBar(
+//           const SnackBar(
+//             content: Text('Permission denied. Cannot load songs.'),
+//           ),
+//         );
+//       }
+//     }
+//   }
+
+//   Future<void> _loadSongs() async {
+//     final songs = await _audioQuery.querySongs(
+//       sortType: SongSortType.TITLE,
+//       orderType: OrderType.ASC_OR_SMALLER,
+//       uriType: UriType.EXTERNAL,
+//       ignoreCase: true,
+//     );
+//     setState(() => _songs = songs);
+//   }
+
+//   // ✅ Updated to use callback instead of Navigator.pushNamed
+//   Future<void> _playSongAndNavigate(
+//     SongModel song,
+//     BuildContext context,
+//   ) async {
+//     try {
+//       print('🎵 Song tapped: ${song.title}');
+
+//       // ✅ Check if audio service is initialized
+//       if (!isAudioServiceInitialized()) {
+//         print('❌ AudioService not initialized yet!');
+//         if (mounted) {
+//           ScaffoldMessenger.of(context).showSnackBar(
+//             const SnackBar(
+//               content: Text('Audio service is not ready yet. Please wait...'),
+//               duration: Duration(seconds: 2),
+//             ),
+//           );
+//         }
+//         return;
+//       }
+
+//       // ✅ Navigate IMMEDIATELY before starting playback
+//       if (mounted) {
+//         widget.onNavigateToPlayer();
+//       }
+
+//       // ✅ Cast audioHandler to AudioPlayerHandler and play the song
+//       final handler = audioHandler as AudioPlayerHandler;
+//       handler.playSong(song); // ✅ Removed await - don't wait for completion
+
+//       print('✅ Navigated to player, song starting...');
+//     } catch (e) {
+//       print('❌ Error in _playSongAndNavigate: $e');
+//       if (mounted) {
+//         ScaffoldMessenger.of(
+//           context,
+//         ).showSnackBar(SnackBar(content: Text('Error playing song: $e')));
+//       }
+//     }
+//   }
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:noir_player/core/services/audio_handler.dart';
@@ -672,7 +776,7 @@ import 'package:on_audio_query/on_audio_query.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class SongsTab extends StatefulWidget {
-  // ✅ Add callback parameter
+  // ✅ Callback for navigating to player
   final VoidCallback onNavigateToPlayer;
 
   const SongsTab({super.key, required this.onNavigateToPlayer});
@@ -725,10 +829,19 @@ class _SongsTabState extends State<SongsTab> {
       uriType: UriType.EXTERNAL,
       ignoreCase: true,
     );
+
     setState(() => _songs = songs);
+
+    // ✅ NEW: set the global queue in AudioHandler
+    if (isAudioServiceInitialized()) {
+      (audioHandler as AudioPlayerHandler).setQueue(songs);
+      print('🎶 Queue set in AudioHandler with ${songs.length} songs.');
+    } else {
+      print('⚠️ AudioService not initialized yet, queue not set.');
+    }
   }
 
-  // ✅ Updated to use callback instead of Navigator.pushNamed
+  // ✅ Updated to register current index when playing a song
   Future<void> _playSongAndNavigate(
     SongModel song,
     BuildContext context,
@@ -736,7 +849,6 @@ class _SongsTabState extends State<SongsTab> {
     try {
       print('🎵 Song tapped: ${song.title}');
 
-      // ✅ Check if audio service is initialized
       if (!isAudioServiceInitialized()) {
         print('❌ AudioService not initialized yet!');
         if (mounted) {
@@ -750,16 +862,25 @@ class _SongsTabState extends State<SongsTab> {
         return;
       }
 
-      // ✅ Navigate IMMEDIATELY before starting playback
+      // ✅ Navigate first
       if (mounted) {
         widget.onNavigateToPlayer();
       }
 
-      // ✅ Cast audioHandler to AudioPlayerHandler and play the song
+      // ✅ Find the tapped song’s index and update handler
       final handler = audioHandler as AudioPlayerHandler;
-      handler.playSong(song); // ✅ Removed await - don't wait for completion
+      final tappedIndex = _songs.indexWhere((s) => s.id == song.id);
 
-      print('✅ Navigated to player, song starting...');
+      if (tappedIndex != -1) {
+        handler.setQueue(_songs); // ensure queue is synced
+        await handler.playSongAt(tappedIndex); // play the song at index
+        print('▶️ Playing song at index $tappedIndex: ${song.title}');
+      } else {
+        print('⚠️ Could not find tapped song in queue.');
+        await handler.playSong(song);
+      }
+
+      print('✅ Navigated to player, playback started.');
     } catch (e) {
       print('❌ Error in _playSongAndNavigate: $e');
       if (mounted) {
@@ -769,6 +890,8 @@ class _SongsTabState extends State<SongsTab> {
       }
     }
   }
+
+  // ⚡ The rest of your UI list (like ListView.builder) stays unchanged.
 
   @override
   Widget build(BuildContext context) {
