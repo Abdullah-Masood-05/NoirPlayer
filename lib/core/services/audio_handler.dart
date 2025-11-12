@@ -332,37 +332,211 @@
 //   }
 // }
 
+// import 'package:audio_service/audio_service.dart';
+// import 'package:just_audio/just_audio.dart';
+// import 'package:on_audio_query/on_audio_query.dart';
+
+// late final AudioHandler audioHandler;
+// bool _isInitialized = false;
+
+// Future<void> initAudioService() async {
+//   if (_isInitialized) {
+//     print('⚠️ AudioService already initialized');
+//     return;
+//   }
+
+//   try {
+//     print('🔄 Initializing AudioService...');
+//     audioHandler = await AudioService.init(
+//       builder: () => AudioPlayerHandler(),
+//       config: const AudioServiceConfig(
+//         androidNotificationChannelId: 'com.example.noir_player.channel.audio',
+//         androidNotificationChannelName: 'Noir Player',
+//         androidNotificationOngoing: true,
+//         androidShowNotificationBadge: true,
+//       ),
+//     );
+//     _isInitialized = true;
+//     print('✅ AudioService initialized successfully.');
+//   } catch (e) {
+//     print('❌ Error initializing AudioService: $e');
+//     print('Stack: ${StackTrace.current}');
+//     rethrow;
+//   }
+// }
+
+// bool isAudioServiceInitialized() => _isInitialized;
+
+// class AudioPlayerHandler extends BaseAudioHandler {
+//   final _player = AudioPlayer();
+//   final OnAudioQuery _audioQuery = OnAudioQuery();
+
+//   // 🎶 Queue management
+//   List<SongModel> _queue = [];
+//   int _currentIndex = 0;
+
+//   // 🎵 Expose position stream for progress bar
+//   Stream<Duration> get positionStream => _player.positionStream;
+
+//   AudioPlayerHandler() {
+//     // 🔁 Update playback state based on player state
+//     _player.playerStateStream.listen((state) {
+//       // Note: do not pass unsupported named parameters (position/bufferedPosition)
+//       playbackState.add(
+//         PlaybackState(
+//           playing: state.playing,
+//           processingState: _mapState(state.processingState),
+//           controls: [
+//             MediaControl.skipToPrevious,
+//             if (state.playing) MediaControl.pause else MediaControl.play,
+//             MediaControl.skipToNext,
+//           ],
+//         ),
+//       );
+//     });
+
+//     // We do NOT call playbackState.copyWith(position: ...) because
+//     // some audio_service versions don't support that named field.
+//     // The UI should use positionStream for position updates.
+//   }
+
+//   // ✅ Play a specific song
+//   Future<void> playSong(SongModel song) async {
+//     try {
+//       print('🎵 Attempting to play: ${song.title}');
+
+//       if (_player.playing) {
+//         await _player.stop();
+//         print('⏹️ Stopped previous song');
+//       }
+
+//       final item = MediaItem(
+//         id: song.id.toString(),
+//         title: song.title,
+//         artist: song.artist ?? 'Unknown Artist',
+//         album: song.album ?? 'Unknown Album',
+//         duration: Duration(milliseconds: song.duration ?? 0),
+//       );
+
+//       mediaItem.add(item);
+//       print('📝 MediaItem created: ${song.title} by ${song.artist}');
+
+//       await _player.setFilePath(song.data);
+//       print('✅ File path set');
+
+//       await _player.play();
+//       print('▶️ Playing song: ${song.title}');
+//     } catch (e) {
+//       print('❌ Error playing song: $e');
+//       print('Stack trace: ${StackTrace.current}');
+//     }
+//   }
+
+//   // 🎧 Manage the song queue
+//   void setQueue(List<SongModel> songs) {
+//     _queue = songs;
+//     print('🎶 Queue set with ${songs.length} songs');
+//   }
+
+//   Future<void> playSongAt(int index) async {
+//     if (_queue.isEmpty || index < 0 || index >= _queue.length) {
+//       print('⚠️ Invalid index or empty queue');
+//       return;
+//     }
+//     _currentIndex = index;
+//     await playSong(_queue[_currentIndex]);
+//   }
+
+//   Future<void> playNext() async {
+//     if (_queue.isEmpty) {
+//       print('⚠️ Queue is empty, cannot play next.');
+//       return;
+//     }
+//     _currentIndex = (_currentIndex + 1) % _queue.length;
+//     print('⏭️ Playing next song (index: $_currentIndex)');
+//     await playSongAt(_currentIndex);
+//   }
+
+//   Future<void> playPrevious() async {
+//     if (_queue.isEmpty) {
+//       print('⚠️ Queue is empty, cannot play previous.');
+//       return;
+//     }
+//     _currentIndex = (_currentIndex - 1 + _queue.length) % _queue.length;
+//     print('⏮️ Playing previous song (index: $_currentIndex)');
+//     await playSongAt(_currentIndex);
+//   }
+
+//   @override
+//   Future<void> play() async {
+//     print('▶️ Play called');
+//     await _player.play();
+//   }
+
+//   @override
+//   Future<void> pause() async {
+//     print('⏸️ Pause called');
+//     await _player.pause();
+//   }
+
+//   @override
+//   Future<void> stop() async {
+//     print('⏹️ Stop called');
+//     await _player.stop();
+//     await super.stop();
+//   }
+
+//   // 🎯 Seek to a specific position (for slider)
+//   @override
+//   Future<void> seek(Duration position) async {
+//     print('⏩ Seeking to: ${position.inSeconds}s');
+//     await _player.seek(position);
+//   }
+
+//   @override
+//   Future<void> dispose() async {
+//     await _player.dispose();
+//   }
+
+//   // 🧭 Helper to map JustAudio -> AudioService states
+//   AudioProcessingState _mapState(ProcessingState state) {
+//     switch (state) {
+//       case ProcessingState.idle:
+//         return AudioProcessingState.idle;
+//       case ProcessingState.loading:
+//         return AudioProcessingState.loading;
+//       case ProcessingState.buffering:
+//         return AudioProcessingState.buffering;
+//       case ProcessingState.ready:
+//         return AudioProcessingState.ready;
+//       case ProcessingState.completed:
+//         return AudioProcessingState.completed;
+//     }
+//   }
+// }
+
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:on_audio_query/on_audio_query.dart';
+import '../models/playlist_model.dart'; // <-- import your PlaylistSong
 
 late final AudioHandler audioHandler;
 bool _isInitialized = false;
 
 Future<void> initAudioService() async {
-  if (_isInitialized) {
-    print('⚠️ AudioService already initialized');
-    return;
-  }
+  if (_isInitialized) return;
 
-  try {
-    print('🔄 Initializing AudioService...');
-    audioHandler = await AudioService.init(
-      builder: () => AudioPlayerHandler(),
-      config: const AudioServiceConfig(
-        androidNotificationChannelId: 'com.example.noir_player.channel.audio',
-        androidNotificationChannelName: 'Noir Player',
-        androidNotificationOngoing: true,
-        androidShowNotificationBadge: true,
-      ),
-    );
-    _isInitialized = true;
-    print('✅ AudioService initialized successfully.');
-  } catch (e) {
-    print('❌ Error initializing AudioService: $e');
-    print('Stack: ${StackTrace.current}');
-    rethrow;
-  }
+  audioHandler = await AudioService.init(
+    builder: () => AudioPlayerHandler(),
+    config: const AudioServiceConfig(
+      androidNotificationChannelId: 'com.example.noir_player.channel.audio',
+      androidNotificationChannelName: 'Noir Player',
+      androidNotificationOngoing: true,
+      androidShowNotificationBadge: true,
+    ),
+  );
+
+  _isInitialized = true;
 }
 
 bool isAudioServiceInitialized() => _isInitialized;
@@ -371,17 +545,14 @@ class AudioPlayerHandler extends BaseAudioHandler {
   final _player = AudioPlayer();
   final OnAudioQuery _audioQuery = OnAudioQuery();
 
-  // 🎶 Queue management
-  List<SongModel> _queue = [];
+  // 🎶 Queue can be either SongModel or PlaylistSong
+  List<dynamic> _queue = [];
   int _currentIndex = 0;
 
-  // 🎵 Expose position stream for progress bar
   Stream<Duration> get positionStream => _player.positionStream;
 
   AudioPlayerHandler() {
-    // 🔁 Update playback state based on player state
     _player.playerStateStream.listen((state) {
-      // Note: do not pass unsupported named parameters (position/bufferedPosition)
       playbackState.add(
         PlaybackState(
           playing: state.playing,
@@ -394,111 +565,94 @@ class AudioPlayerHandler extends BaseAudioHandler {
         ),
       );
     });
-
-    // We do NOT call playbackState.copyWith(position: ...) because
-    // some audio_service versions don't support that named field.
-    // The UI should use positionStream for position updates.
   }
 
-  // ✅ Play a specific song
-  Future<void> playSong(SongModel song) async {
+  // ✅ Play a SongModel or PlaylistSong
+  Future<void> playSong(dynamic song) async {
     try {
-      print('🎵 Attempting to play: ${song.title}');
+      String path;
+      String title;
+      String artist;
+      String album = '';
+      int? durationMs;
 
-      if (_player.playing) {
-        await _player.stop();
-        print('⏹️ Stopped previous song');
+      if (song is SongModel) {
+        path = song.data;
+        title = song.title;
+        artist = song.artist ?? 'Unknown Artist';
+        album = song.album ?? '';
+        durationMs = song.duration;
+      } else if (song is PlaylistSong) {
+        path = song.data;
+        title = song.title;
+        artist = song.artist ?? 'Unknown Artist';
+        //album = song.album ?? '';
+        durationMs = song.duration;
+      } else {
+        throw Exception('Unsupported song type');
       }
 
       final item = MediaItem(
-        id: song.id.toString(),
-        title: song.title,
-        artist: song.artist ?? 'Unknown Artist',
-        album: song.album ?? 'Unknown Album',
-        duration: Duration(milliseconds: song.duration ?? 0),
+        id: song is SongModel
+            ? song.id.toString()
+            : (song as PlaylistSong).id.toString(),
+        title: title,
+        artist: artist,
+        album: album,
+        duration: Duration(milliseconds: durationMs ?? 0),
       );
 
       mediaItem.add(item);
-      print('📝 MediaItem created: ${song.title} by ${song.artist}');
 
-      await _player.setFilePath(song.data);
-      print('✅ File path set');
-
+      await _player.setFilePath(path);
       await _player.play();
-      print('▶️ Playing song: ${song.title}');
     } catch (e) {
       print('❌ Error playing song: $e');
-      print('Stack trace: ${StackTrace.current}');
     }
   }
 
-  // 🎧 Manage the song queue
-  void setQueue(List<SongModel> songs) {
+  // 🎧 Manage the queue
+  void setQueue(List<dynamic> songs) {
     _queue = songs;
     print('🎶 Queue set with ${songs.length} songs');
   }
 
   Future<void> playSongAt(int index) async {
-    if (_queue.isEmpty || index < 0 || index >= _queue.length) {
-      print('⚠️ Invalid index or empty queue');
-      return;
-    }
+    if (_queue.isEmpty || index < 0 || index >= _queue.length) return;
     _currentIndex = index;
     await playSong(_queue[_currentIndex]);
   }
 
   Future<void> playNext() async {
-    if (_queue.isEmpty) {
-      print('⚠️ Queue is empty, cannot play next.');
-      return;
-    }
+    if (_queue.isEmpty) return;
     _currentIndex = (_currentIndex + 1) % _queue.length;
-    print('⏭️ Playing next song (index: $_currentIndex)');
     await playSongAt(_currentIndex);
   }
 
   Future<void> playPrevious() async {
-    if (_queue.isEmpty) {
-      print('⚠️ Queue is empty, cannot play previous.');
-      return;
-    }
+    if (_queue.isEmpty) return;
     _currentIndex = (_currentIndex - 1 + _queue.length) % _queue.length;
-    print('⏮️ Playing previous song (index: $_currentIndex)');
     await playSongAt(_currentIndex);
   }
 
   @override
-  Future<void> play() async {
-    print('▶️ Play called');
-    await _player.play();
-  }
+  Future<void> play() async => _player.play();
 
   @override
-  Future<void> pause() async {
-    print('⏸️ Pause called');
-    await _player.pause();
-  }
+  Future<void> pause() async => _player.pause();
 
   @override
   Future<void> stop() async {
-    print('⏹️ Stop called');
     await _player.stop();
     await super.stop();
   }
 
-  // 🎯 Seek to a specific position (for slider)
   @override
-  Future<void> seek(Duration position) async {
-    print('⏩ Seeking to: ${position.inSeconds}s');
-    await _player.seek(position);
-  }
+  Future<void> seek(Duration position) async => _player.seek(position);
 
   @override
-  Future<void> dispose() async {
-    await _player.dispose();
-  }
+  Future<void> dispose() async => await _player.dispose();
 
-  // 🧭 Helper to map JustAudio -> AudioService states
   AudioProcessingState _mapState(ProcessingState state) {
     switch (state) {
       case ProcessingState.idle:

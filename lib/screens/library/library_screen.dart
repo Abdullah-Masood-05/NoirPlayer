@@ -229,7 +229,7 @@ class _LibraryScreenState extends State<LibraryScreen>
           SongsTab(onNavigateToPlayer: widget.onNavigateToPlayer),
           const AlbumsTab(),
           const ArtistsTab(),
-          const PlaylistsTab(),
+          PlaylistsTab(onNavigateToPlayer: widget.onNavigateToPlayer),
         ],
       ),
     );

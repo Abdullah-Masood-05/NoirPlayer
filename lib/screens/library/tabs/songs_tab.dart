@@ -769,14 +769,248 @@
 //       }
 //     }
 //   }
+
+// !MAIN CODE BELOW
+// import 'package:audio_service/audio_service.dart';
+// import 'package:flutter/material.dart';
+// import 'package:noir_player/core/services/audio_handler.dart';
+// import 'package:on_audio_query/on_audio_query.dart';
+// import 'package:permission_handler/permission_handler.dart';
+
+// class SongsTab extends StatefulWidget {
+//   // ✅ Callback for navigating to player
+//   final VoidCallback onNavigateToPlayer;
+
+//   const SongsTab({super.key, required this.onNavigateToPlayer});
+
+//   @override
+//   State<SongsTab> createState() => _SongsTabState();
+// }
+
+// class _SongsTabState extends State<SongsTab> {
+//   final OnAudioQuery _audioQuery = OnAudioQuery();
+//   List<SongModel> _songs = [];
+//   String _searchText = '';
+
+//   @override
+//   void initState() {
+//     super.initState();
+//     _requestPermissionAndLoad();
+//   }
+
+//   Future<void> _requestPermissionAndLoad() async {
+//     if (await Permission.audio.isGranted ||
+//         await Permission.storage.isGranted) {
+//       _loadSongs();
+//       return;
+//     }
+
+//     if (await Permission.audio.request().isGranted ||
+//         await Permission.storage.request().isGranted) {
+//       if (mounted) {
+//         ScaffoldMessenger.of(
+//           context,
+//         ).showSnackBar(const SnackBar(content: Text('Loaded all songs.')));
+//       }
+//       _loadSongs();
+//     } else {
+//       if (mounted) {
+//         ScaffoldMessenger.of(context).showSnackBar(
+//           const SnackBar(
+//             content: Text('Permission denied. Cannot load songs.'),
+//           ),
+//         );
+//       }
+//     }
+//   }
+
+//   Future<void> _loadSongs() async {
+//     final songs = await _audioQuery.querySongs(
+//       sortType: SongSortType.TITLE,
+//       orderType: OrderType.ASC_OR_SMALLER,
+//       uriType: UriType.EXTERNAL,
+//       ignoreCase: true,
+//     );
+
+//     setState(() => _songs = songs);
+
+//     // ✅ NEW: set the global queue in AudioHandler
+//     if (isAudioServiceInitialized()) {
+//       (audioHandler as AudioPlayerHandler).setQueue(songs);
+//       print('🎶 Queue set in AudioHandler with ${songs.length} songs.');
+//     } else {
+//       print('⚠️ AudioService not initialized yet, queue not set.');
+//     }
+//   }
+
+//   // ✅ Updated to register current index when playing a song
+//   Future<void> _playSongAndNavigate(
+//     SongModel song,
+//     BuildContext context,
+//   ) async {
+//     try {
+//       print('🎵 Song tapped: ${song.title}');
+
+//       if (!isAudioServiceInitialized()) {
+//         print('❌ AudioService not initialized yet!');
+//         if (mounted) {
+//           ScaffoldMessenger.of(context).showSnackBar(
+//             const SnackBar(
+//               content: Text('Audio service is not ready yet. Please wait...'),
+//               duration: Duration(seconds: 2),
+//             ),
+//           );
+//         }
+//         return;
+//       }
+
+//       // ✅ Navigate first
+//       if (mounted) {
+//         widget.onNavigateToPlayer();
+//       }
+
+//       // ✅ Find the tapped song’s index and update handler
+//       final handler = audioHandler as AudioPlayerHandler;
+//       final tappedIndex = _songs.indexWhere((s) => s.id == song.id);
+
+//       if (tappedIndex != -1) {
+//         handler.setQueue(_songs); // ensure queue is synced
+//         await handler.playSongAt(tappedIndex); // play the song at index
+//         print('▶️ Playing song at index $tappedIndex: ${song.title}');
+//       } else {
+//         print('⚠️ Could not find tapped song in queue.');
+//         await handler.playSong(song);
+//       }
+
+//       print('✅ Navigated to player, playback started.');
+//     } catch (e) {
+//       print('❌ Error in _playSongAndNavigate: $e');
+//       if (mounted) {
+//         ScaffoldMessenger.of(
+//           context,
+//         ).showSnackBar(SnackBar(content: Text('Error playing song: $e')));
+//       }
+//     }
+//   }
+
+//   // ⚡ The rest of your UI list (like ListView.builder) stays unchanged.
+
+//   @override
+//   Widget build(BuildContext context) {
+//     final filteredSongs = _songs
+//         .where(
+//           (song) =>
+//               song.title.toLowerCase().contains(_searchText.toLowerCase()) ||
+//               (song.artist ?? '').toLowerCase().contains(
+//                 _searchText.toLowerCase(),
+//               ),
+//         )
+//         .toList();
+
+//     return Column(
+//       children: [
+//         Padding(
+//           padding: const EdgeInsets.all(8.0),
+//           child: TextField(
+//             decoration: const InputDecoration(
+//               hintText: 'Search songs or artists...',
+//               prefixIcon: Icon(Icons.search),
+//               filled: true,
+//             ),
+//             onChanged: (value) => setState(() => _searchText = value),
+//           ),
+//         ),
+//         Expanded(
+//           child: _songs.isEmpty
+//               ? const Center(child: CircularProgressIndicator())
+//               : RefreshIndicator(
+//                   onRefresh: _loadSongs,
+//                   child: ListView.builder(
+//                     // ✅ Smooth scrolling physics for 120Hz displays
+//                     physics: const BouncingScrollPhysics(
+//                       parent: AlwaysScrollableScrollPhysics(),
+//                     ),
+//                     // ✅ Enable caching for better performance
+//                     cacheExtent: 500,
+//                     itemCount: filteredSongs.length,
+//                     itemBuilder: (context, index) {
+//                       final song = filteredSongs[index];
+//                       // ✅ Add staggered animation
+//                       return AnimatedBuilder(
+//                         animation: AlwaysStoppedAnimation(0),
+//                         builder: (context, child) {
+//                           return TweenAnimationBuilder<double>(
+//                             duration: Duration(
+//                               milliseconds: 200 + (index * 20).clamp(0, 400),
+//                             ),
+//                             tween: Tween(begin: 0.0, end: 1.0),
+//                             curve: Curves.easeOutCubic,
+//                             builder: (context, value, child) {
+//                               return Opacity(
+//                                 opacity: value,
+//                                 child: Transform.translate(
+//                                   offset: Offset(0, 20 * (1 - value)),
+//                                   child: child,
+//                                 ),
+//                               );
+//                             },
+//                             child: child,
+//                           );
+//                         },
+//                         child: ListTile(
+//                           // ✅ Add hero animation for artwork
+//                           leading: Hero(
+//                             tag: 'song_${song.id}',
+//                             child: QueryArtworkWidget(
+//                               id: song.id,
+//                               type: ArtworkType.AUDIO,
+//                               nullArtworkWidget: const Icon(
+//                                 Icons.music_note,
+//                                 size: 40,
+//                               ),
+//                             ),
+//                           ),
+//                           title: Text(
+//                             song.title,
+//                             maxLines: 1,
+//                             overflow: TextOverflow.ellipsis,
+//                           ),
+//                           subtitle: Text(song.artist ?? "Unknown Artist"),
+//                           trailing: Text(
+//                             _formatDuration(song.duration ?? 0),
+//                             style: const TextStyle(color: Colors.white60),
+//                           ),
+//                           onTap: () => _playSongAndNavigate(song, context),
+//                         ),
+//                       );
+//                     },
+//                   ),
+//                 ),
+//         ),
+//       ],
+//     );
+//   }
+
+//   String _formatDuration(int milliseconds) {
+//     final seconds = (milliseconds / 1000).round();
+//     final minutes = seconds ~/ 60;
+//     final remaining = (seconds % 60).toString().padLeft(2, '0');
+//     return '$minutes:$remaining';
+//   }
+// }
+
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:noir_player/core/services/audio_handler.dart';
-import 'package:on_audio_query/on_audio_query.dart';
+import 'package:on_audio_query/on_audio_query.dart' hide PlaylistModel;
 import 'package:permission_handler/permission_handler.dart';
+import '../../../core/models/playlist_model.dart';
+import 'package:path_provider/path_provider.dart';
 
 class SongsTab extends StatefulWidget {
-  // ✅ Callback for navigating to player
   final VoidCallback onNavigateToPlayer;
 
   const SongsTab({super.key, required this.onNavigateToPlayer});
@@ -788,12 +1022,56 @@ class SongsTab extends StatefulWidget {
 class _SongsTabState extends State<SongsTab> {
   final OnAudioQuery _audioQuery = OnAudioQuery();
   List<SongModel> _songs = [];
+  List<PlaylistModel> _playlists = [];
   String _searchText = '';
 
   @override
   void initState() {
     super.initState();
     _requestPermissionAndLoad();
+    _loadPlaylists();
+  }
+
+  Future<File> get _playlistFile async {
+    final dir = await getApplicationDocumentsDirectory();
+    return File('${dir.path}/playlists.json');
+  }
+
+  Future<void> _loadPlaylists() async {
+    try {
+      final file = await _playlistFile;
+      if (await file.exists()) {
+        final content = await file.readAsString();
+        final List<dynamic> jsonList = jsonDecode(content);
+        setState(() {
+          _playlists = jsonList.map((e) => PlaylistModel.fromJson(e)).toList();
+        });
+      } else {
+        // create default playlist
+        final fav = PlaylistModel(
+          name: 'Favorites',
+          songs: [],
+          isFavourite: true,
+        );
+        setState(() {
+          _playlists = [fav];
+        });
+        await _savePlaylists();
+      }
+    } catch (e) {
+      print('❌ Error loading playlists: $e');
+    }
+  }
+
+  Future<void> _savePlaylists() async {
+    try {
+      final file = await _playlistFile;
+      await file.writeAsString(
+        jsonEncode(_playlists.map((p) => p.toJson()).toList()),
+      );
+    } catch (e) {
+      print('❌ Error saving playlists: $e');
+    }
   }
 
   Future<void> _requestPermissionAndLoad() async {
@@ -832,78 +1110,110 @@ class _SongsTabState extends State<SongsTab> {
 
     setState(() => _songs = songs);
 
-    // ✅ NEW: set the global queue in AudioHandler
     if (isAudioServiceInitialized()) {
       (audioHandler as AudioPlayerHandler).setQueue(songs);
       print('🎶 Queue set in AudioHandler with ${songs.length} songs.');
-    } else {
-      print('⚠️ AudioService not initialized yet, queue not set.');
     }
   }
 
-  // ✅ Updated to register current index when playing a song
   Future<void> _playSongAndNavigate(
     SongModel song,
     BuildContext context,
   ) async {
-    try {
-      print('🎵 Song tapped: ${song.title}');
+    if (!isAudioServiceInitialized()) return;
 
-      if (!isAudioServiceInitialized()) {
-        print('❌ AudioService not initialized yet!');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Audio service is not ready yet. Please wait...'),
-              duration: Duration(seconds: 2),
-            ),
-          );
-        }
-        return;
-      }
+    widget.onNavigateToPlayer();
 
-      // ✅ Navigate first
-      if (mounted) {
-        widget.onNavigateToPlayer();
-      }
+    final handler = audioHandler as AudioPlayerHandler;
+    final tappedIndex = _songs.indexWhere((s) => s.id == song.id);
 
-      // ✅ Find the tapped song’s index and update handler
-      final handler = audioHandler as AudioPlayerHandler;
-      final tappedIndex = _songs.indexWhere((s) => s.id == song.id);
-
-      if (tappedIndex != -1) {
-        handler.setQueue(_songs); // ensure queue is synced
-        await handler.playSongAt(tappedIndex); // play the song at index
-        print('▶️ Playing song at index $tappedIndex: ${song.title}');
-      } else {
-        print('⚠️ Could not find tapped song in queue.');
-        await handler.playSong(song);
-      }
-
-      print('✅ Navigated to player, playback started.');
-    } catch (e) {
-      print('❌ Error in _playSongAndNavigate: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error playing song: $e')));
-      }
+    if (tappedIndex != -1) {
+      handler.setQueue(_songs);
+      await handler.playSongAt(tappedIndex);
+    } else {
+      await handler.playSong(song);
     }
   }
 
-  // ⚡ The rest of your UI list (like ListView.builder) stays unchanged.
+  Future<void> _addSongToPlaylist(SongModel song) async {
+    if (_playlists.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No playlists available.')));
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Add to Playlist'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: _playlists.length,
+              itemBuilder: (context, index) {
+                final playlist = _playlists[index];
+                return ListTile(
+                  title: Text(playlist.name),
+                  onTap: () async {
+                    // Avoid duplicates
+                    if (!playlist.songs.any((s) => s.id == song.id)) {
+                      playlist.songs.add(
+                        PlaylistSong(
+                          id: song.id,
+                          title: song.title,
+                          artist:
+                              song.artist ??
+                              'Unknown Artist', // ✅ fallback for null
+                          data: song.data,
+                          duration: song.duration,
+                        ),
+                      );
+                      await _savePlaylists();
+                      setState(() {}); // update UI if needed
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Added "${song.title}" to ${playlist.name}',
+                          ),
+                        ),
+                      );
+                    } else {
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            '"${song.title}" is already in ${playlist.name}',
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final filteredSongs = _songs
-        .where(
-          (song) =>
-              song.title.toLowerCase().contains(_searchText.toLowerCase()) ||
-              (song.artist ?? '').toLowerCase().contains(
-                _searchText.toLowerCase(),
-              ),
-        )
-        .toList();
+    final filteredSongs = _songs.where((song) {
+      final lowerSearch = _searchText.toLowerCase();
+      return song.title.toLowerCase().contains(lowerSearch) ||
+          (song.artist ?? '').toLowerCase().contains(lowerSearch);
+    }).toList();
 
     return Column(
       children: [
@@ -924,62 +1234,35 @@ class _SongsTabState extends State<SongsTab> {
               : RefreshIndicator(
                   onRefresh: _loadSongs,
                   child: ListView.builder(
-                    // ✅ Smooth scrolling physics for 120Hz displays
                     physics: const BouncingScrollPhysics(
                       parent: AlwaysScrollableScrollPhysics(),
                     ),
-                    // ✅ Enable caching for better performance
                     cacheExtent: 500,
                     itemCount: filteredSongs.length,
                     itemBuilder: (context, index) {
                       final song = filteredSongs[index];
-                      // ✅ Add staggered animation
-                      return AnimatedBuilder(
-                        animation: AlwaysStoppedAnimation(0),
-                        builder: (context, child) {
-                          return TweenAnimationBuilder<double>(
-                            duration: Duration(
-                              milliseconds: 200 + (index * 20).clamp(0, 400),
-                            ),
-                            tween: Tween(begin: 0.0, end: 1.0),
-                            curve: Curves.easeOutCubic,
-                            builder: (context, value, child) {
-                              return Opacity(
-                                opacity: value,
-                                child: Transform.translate(
-                                  offset: Offset(0, 20 * (1 - value)),
-                                  child: child,
-                                ),
-                              );
-                            },
-                            child: child,
-                          );
-                        },
-                        child: ListTile(
-                          // ✅ Add hero animation for artwork
-                          leading: Hero(
-                            tag: 'song_${song.id}',
-                            child: QueryArtworkWidget(
-                              id: song.id,
-                              type: ArtworkType.AUDIO,
-                              nullArtworkWidget: const Icon(
-                                Icons.music_note,
-                                size: 40,
-                              ),
-                            ),
+                      return ListTile(
+                        leading: QueryArtworkWidget(
+                          id: song.id,
+                          type: ArtworkType.AUDIO,
+                          nullArtworkWidget: const Icon(
+                            Icons.music_note,
+                            size: 40,
                           ),
-                          title: Text(
-                            song.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          subtitle: Text(song.artist ?? "Unknown Artist"),
-                          trailing: Text(
-                            _formatDuration(song.duration ?? 0),
-                            style: const TextStyle(color: Colors.white60),
-                          ),
-                          onTap: () => _playSongAndNavigate(song, context),
                         ),
+                        title: Text(
+                          song.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(song.artist ?? "Unknown Artist"),
+                        trailing: Text(
+                          _formatDuration(song.duration ?? 0),
+                          style: const TextStyle(color: Colors.white60),
+                        ),
+                        onTap: () => _playSongAndNavigate(song, context),
+                        onLongPress: () =>
+                            _addSongToPlaylist(song), // ✅ Added long press
                       );
                     },
                   ),

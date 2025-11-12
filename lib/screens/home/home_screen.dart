@@ -188,7 +188,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final List<Widget> screens = [
       LibraryScreen(onNavigateToPlayer: _navigateToPlayer),
       const PlayerScreen(),
-      const PlaylistsScreen(),
+      PlaylistsScreen(onNavigateToPlayer: _navigateToPlayer),
       const SettingsScreen(),
     ];
 

@@ -5,6 +5,7 @@ import 'package:noir_player/screens/player/player_screen.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'core/theme/app_theme.dart';
 import 'screens/home/home_screen.dart';
+//import 'screens/playlists/playlists_screen.dart';
 
 // Future<void> _requestPermissions() async {
 //   [Permission.storage].request;
@@ -30,6 +31,11 @@ class NoirPlayerApp extends StatelessWidget {
       routes: {
         '/': (context) => const HomeScreen(),
         '/player': (context) => const PlayerScreen(),
+        // '/playlists_screen': (context) => PlaylistsScreen(
+        //       onNavigateToPlayer: () {
+        //         Navigator.of(context).pushNamed('/player');
+        //       },
+        //     ),
       },
     );
   }
