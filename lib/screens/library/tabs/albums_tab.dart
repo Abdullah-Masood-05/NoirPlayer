@@ -268,37 +268,26 @@ class _AlbumsTabState extends State<AlbumsTab> {
             final album = albums[index];
 
             return GestureDetector(
-              onTap:
-                  ()
-                  // {
-                  //   // ✅ Navigate to album songs
-                  //   Navigator.push(
-                  //     context,
-                  //     MaterialPageRoute(
-                  //       builder: (_) => AlbumSongsScreen(album: album),
-                  //     ),
-                  //   );
-                  // },
-                  {
-                    // ✅ Navigate to the album‑songs screen **and** provide the callback
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => AlbumSongsScreen(
-                          album: album,
-                          onNavigateToPlayer: () {
-                            // This is executed *inside* AlbumSongsScreen before playback.
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    const PlayerScreen(), // or whatever you use
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    );
-                  },
+              onTap: () {
+                // ✅ Navigate to the album‑songs screen **and** provide the callback
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => AlbumSongsScreen(
+                      album: album,
+                      onNavigateToPlayer: () {
+                        // This is executed *inside* AlbumSongsScreen before playback.
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                const PlayerScreen(), // or whatever you use
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                );
+              },
               child: Card(
                 elevation: 3,
                 shape: RoundedRectangleBorder(
