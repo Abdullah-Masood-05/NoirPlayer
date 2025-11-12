@@ -61,30 +61,34 @@ Noir Player is a small, cross‑platform Flutter app that:
 lib/
 ├── main.dart
 ├── core/
-│   └── services/
-│       └── audio_handler.dart
+│   ├── services/
+│   │   └── audio_handler.dart
 │   └── theme/
 │       └── app_theme.dart
 ├── screens/
 │   ├── home/
 │   │   └── home_screen.dart
 │   ├── library/
-│   │   └── tabs/
-│   │       └── albums_tab.dart
-│   │       └── artists_tab.dart
-│   │       └── playlists_tab.dart
-│   │       └── songs_tab.dart
+│   │   ├── tabs/
+│   │   │   ├── albums_tab.dart
+│   │   │   ├── artists_tab.dart
+│   │   │   ├── playlists_tab.dart
+│   │   │   └── songs_tab.dart
 │   │   └── library_screen.dart
 │   ├── player/
 │   │   └── player_screen.dart
 │   ├── playlists/
-│   │   └── playlists_screen.dart
+│   │   ├── playlists_screen.dart
+│   │   └── playlist_songs_screen.dart
+│   ├── albums/
+│   │   └── album_songs_screen.dart
+│   ├── artist/
+│   │   └── artist_songs_screen.dart
 │   └── settings/
 │       └── settings_screen.dart
 ├── widgets/
 │   └── query_artwork_widget.dart
 └── ...
-
 
 ```
 
