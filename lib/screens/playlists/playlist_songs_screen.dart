@@ -83,12 +83,80 @@
 //   }
 // }
 
-
 // lib/screens/playlist/playlist_songs_screen.dart
+
+// import 'package:flutter/material.dart';
+// import '../../core/models/playlist_model.dart';
+// import '../../core/services/audio_handler.dart';
+// import '../../screens/player/player_screen.dart';
+
+// class PlaylistSongsScreen extends StatefulWidget {
+//   final PlaylistModel playlist;
+//   final VoidCallback onNavigateToPlayer;
+//   final VoidCallback onUpdatePlaylist;
+
+//   const PlaylistSongsScreen({
+//     super.key,
+//     required this.playlist,
+//     required this.onNavigateToPlayer,
+//     required this.onUpdatePlaylist,
+//   });
+
+//   @override
+//   State<PlaylistSongsScreen> createState() => _PlaylistSongsScreenState();
+// }
+
+// class _PlaylistSongsScreenState extends State<PlaylistSongsScreen> {
+//   void _playSong(int index) {
+//     final handler = audioHandler as AudioPlayerHandler;
+//     handler.setQueue(
+//       widget.playlist.songs.map((s) {
+//         return s; // use PlaylistSong directly if AudioHandler supports it
+//       }).toList(),
+//     );
+//     handler.playSongAt(index);
+//     widget.onNavigateToPlayer();
+//   }
+
+//   void _removeSong(int index) {
+//     setState(() {
+//       widget.playlist.songs.removeAt(index);
+//     });
+//     widget.onUpdatePlaylist();
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     final songs = widget.playlist.songs;
+//     return Scaffold(
+//       appBar: AppBar(title: Text(widget.playlist.name)),
+//       body: songs.isEmpty
+//           ? const Center(child: Text('No songs in this playlist'))
+//           : ListView.separated(
+//               itemCount: songs.length,
+//               separatorBuilder: (_, __) => const Divider(),
+//               itemBuilder: (context, index) {
+//                 final song = songs[index];
+//                 return ListTile(
+//                   title: Text(song.title),
+//                   subtitle: Text(song.artist),
+//                   trailing: IconButton(
+//                     icon: const Icon(Icons.delete),
+//                     onPressed: () => _removeSong(index),
+//                   ),
+//                   onTap: () => _playSong(index),
+//                 );
+//               },
+//             ),
+//     );
+//   }
+// }
+
 import 'package:flutter/material.dart';
+import 'package:noir_player/screens/player/player_screen.dart';
+import 'package:on_audio_query/on_audio_query.dart' as on_audio;
 import '../../core/models/playlist_model.dart';
 import '../../core/services/audio_handler.dart';
-import '../../screens/player/player_screen.dart';
 
 class PlaylistSongsScreen extends StatefulWidget {
   final PlaylistModel playlist;
@@ -107,15 +175,23 @@ class PlaylistSongsScreen extends StatefulWidget {
 }
 
 class _PlaylistSongsScreenState extends State<PlaylistSongsScreen> {
-  void _playSong(int index) {
+  void _playSong(int index) async {
+    if (!mounted) return;
+    Navigator.of(context).pop();
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => PlayerScreen()));
     final handler = audioHandler as AudioPlayerHandler;
-    handler.setQueue(
-      widget.playlist.songs.map((s) {
-        return s; // use PlaylistSong directly if AudioHandler supports it
-      }).toList(),
-    );
-    handler.playSongAt(index);
-    widget.onNavigateToPlayer();
+
+    // Set the playlist queue
+    handler.setQueue(widget.playlist.songs);
+
+    // Play the selected song
+    await handler.playSongAt(index);
+
+    // First pop the current screen
+
+    // Then navigate to player screen
   }
 
   void _removeSong(int index) {
@@ -125,9 +201,17 @@ class _PlaylistSongsScreenState extends State<PlaylistSongsScreen> {
     widget.onUpdatePlaylist();
   }
 
+  String _formatDuration(int milliseconds) {
+    final seconds = (milliseconds / 1000).round();
+    final minutes = seconds ~/ 60;
+    final remaining = (seconds % 60).toString().padLeft(2, '0');
+    return '$minutes:$remaining';
+  }
+
   @override
   Widget build(BuildContext context) {
     final songs = widget.playlist.songs;
+
     return Scaffold(
       appBar: AppBar(title: Text(widget.playlist.name)),
       body: songs.isEmpty
@@ -137,12 +221,42 @@ class _PlaylistSongsScreenState extends State<PlaylistSongsScreen> {
               separatorBuilder: (_, __) => const Divider(),
               itemBuilder: (context, index) {
                 final song = songs[index];
+
                 return ListTile(
-                  title: Text(song.title),
-                  subtitle: Text(song.artist),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete),
-                    onPressed: () => _removeSong(index),
+                  leading: on_audio.QueryArtworkWidget(
+                    id: song.id,
+                    type: on_audio.ArtworkType.AUDIO,
+                    nullArtworkWidget: Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[800],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.music_note,
+                        color: Colors.white54,
+                      ),
+                    ),
+                  ),
+                  title: Text(
+                    song.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(song.artist ?? 'Unknown Artist'),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _formatDuration(song.duration ?? 0),
+                        style: const TextStyle(color: Colors.white60),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete),
+                        onPressed: () => _removeSong(index),
+                      ),
+                    ],
                   ),
                   onTap: () => _playSong(index),
                 );
