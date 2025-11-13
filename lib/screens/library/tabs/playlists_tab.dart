@@ -320,14 +320,164 @@
 
 
 // lib/screens/library/tabs/playlists_tab.dart
+// import 'dart:convert';
+// import 'dart:io';
+// import 'package:flutter/material.dart';
+// import 'package:path_provider/path_provider.dart';
+// import '../../../core/models/playlist_model.dart';
+// import '../../playlists/playlist_songs_screen.dart';
+// import '../../player/player_screen.dart';
+// import '../../../core/services/audio_handler.dart';
+
+// class PlaylistsTab extends StatefulWidget {
+//   final VoidCallback onNavigateToPlayer;
+
+//   const PlaylistsTab({super.key, required this.onNavigateToPlayer});
+
+//   @override
+//   State<PlaylistsTab> createState() => _PlaylistsTabState();
+// }
+
+// class _PlaylistsTabState extends State<PlaylistsTab> {
+//   List<PlaylistModel> _playlists = [];
+
+//   @override
+//   void initState() {
+//     super.initState();
+//     _loadPlaylists();
+//   }
+
+//   Future<File> get _localFile async {
+//     final dir = await getApplicationDocumentsDirectory();
+//     return File('${dir.path}/playlists.json');
+//   }
+
+//   Future<void> _loadPlaylists() async {
+//     try {
+//       final file = await _localFile;
+//       if (await file.exists()) {
+//         final content = await file.readAsString();
+//         final jsonList = jsonDecode(content) as List<dynamic>;
+//         setState(() {
+//           _playlists = jsonList
+//               .map((e) => PlaylistModel.fromJson(e as Map<String, dynamic>))
+//               .toList();
+//         });
+//       } else {
+//         // create default favorites playlist
+//         final favorite = PlaylistModel(name: 'Favorites', songs: [], isFavourite: true);
+//         _playlists = [favorite];
+//         await _savePlaylists();
+//       }
+//     } catch (e) {
+//       debugPrint('Error loading playlists: $e');
+//     }
+//   }
+
+//   Future<void> _savePlaylists() async {
+//     final file = await _localFile;
+//     await file.writeAsString(jsonEncode(_playlists.map((p) => p.toJson()).toList()));
+//   }
+
+//   void _createPlaylist() {
+//     if (_playlists.length >= 5) {
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         const SnackBar(content: Text('Maximum 5 playlists allowed.')),
+//       );
+//       return;
+//     }
+//     showDialog(
+//       context: context,
+//       builder: (ctx) {
+//         final controller = TextEditingController();
+//         return AlertDialog(
+//           title: const Text('New Playlist'),
+//           content: TextField(controller: controller),
+//           actions: [
+//             TextButton(
+//                 onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+//             ElevatedButton(
+//               onPressed: () {
+//                 final name = controller.text.trim();
+//                 if (name.isNotEmpty) {
+//                   setState(() {
+//                     _playlists.add(PlaylistModel(name: name, songs: []));
+//                   });
+//                   _savePlaylists();
+//                   Navigator.pop(ctx);
+//                 }
+//               },
+//               child: const Text('Create'),
+//             ),
+//           ],
+//         );
+//       },
+//     );
+//   }
+
+//   void _deletePlaylist(int index) {
+//     final playlist = _playlists[index];
+//     if (playlist.isFavourite) return;
+//     setState(() {
+//       _playlists.removeAt(index);
+//     });
+//     _savePlaylists();
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return Scaffold(
+//       floatingActionButton: FloatingActionButton(
+//         onPressed: _createPlaylist,
+//         child: const Icon(Icons.add),
+//       ),
+//       body: _playlists.isEmpty
+//           ? const Center(child: Text('No playlists yet'))
+//           : ListView.separated(
+//               itemCount: _playlists.length,
+//               separatorBuilder: (_, __) => const Divider(),
+//               itemBuilder: (context, index) {
+//                 final playlist = _playlists[index];
+//                 return ListTile(
+//                   leading: const Icon(Icons.playlist_play),
+//                   title: Text(playlist.name),
+//                   subtitle: Text('${playlist.songs.length} songs'),
+//                   trailing: playlist.isFavourite
+//                       ? null
+//                       : IconButton(
+//                           icon: const Icon(Icons.delete),
+//                           onPressed: () => _deletePlaylist(index),
+//                         ),
+//                   onTap: () {
+//                     Navigator.push(
+//                       context,
+//                       MaterialPageRoute(
+//                         builder: (_) => PlaylistSongsScreen(
+//                           playlist: playlist,
+//                           onNavigateToPlayer: widget.onNavigateToPlayer,
+//                           onUpdatePlaylist: () {
+//                             setState(() {});
+//                             _savePlaylists();
+//                           },
+//                         ),
+//                       ),
+//                     );
+//                   },
+//                 );
+//               },
+//             ),
+//     );
+//   }
+// }
+
+
+
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../../core/models/playlist_model.dart';
 import '../../playlists/playlist_songs_screen.dart';
-import '../../player/player_screen.dart';
-import '../../../core/services/audio_handler.dart';
 
 class PlaylistsTab extends StatefulWidget {
   final VoidCallback onNavigateToPlayer;
@@ -364,8 +514,8 @@ class _PlaylistsTabState extends State<PlaylistsTab> {
               .toList();
         });
       } else {
-        // create default favorites playlist
-        final favorite = PlaylistModel(name: 'Favorites', songs: [], isFavourite: true);
+        final favorite =
+            PlaylistModel(name: 'Favorites', songs: [], isFavourite: true);
         _playlists = [favorite];
         await _savePlaylists();
       }
@@ -376,7 +526,8 @@ class _PlaylistsTabState extends State<PlaylistsTab> {
 
   Future<void> _savePlaylists() async {
     final file = await _localFile;
-    await file.writeAsString(jsonEncode(_playlists.map((p) => p.toJson()).toList()));
+    await file
+        .writeAsString(jsonEncode(_playlists.map((p) => p.toJson()).toList()));
   }
 
   void _createPlaylist() {
@@ -392,10 +543,16 @@ class _PlaylistsTabState extends State<PlaylistsTab> {
         final controller = TextEditingController();
         return AlertDialog(
           title: const Text('New Playlist'),
-          content: TextField(controller: controller),
+          content: TextField(
+            controller: controller,
+            decoration:
+                const InputDecoration(hintText: 'Enter playlist name...'),
+          ),
           actions: [
             TextButton(
-                onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
             ElevatedButton(
               onPressed: () {
                 final name = controller.text.trim();
@@ -415,13 +572,35 @@ class _PlaylistsTabState extends State<PlaylistsTab> {
     );
   }
 
-  void _deletePlaylist(int index) {
+  Future<void> _confirmDeletePlaylist(int index) async {
     final playlist = _playlists[index];
-    if (playlist.isFavourite) return;
-    setState(() {
-      _playlists.removeAt(index);
-    });
-    _savePlaylists();
+    if (playlist.isFavourite) return; // cannot delete favourites
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Playlist'),
+        content: Text('Are you sure you want to delete "${playlist.name}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      setState(() => _playlists.removeAt(index));
+      _savePlaylists();
+    }
   }
 
   @override
@@ -439,15 +618,13 @@ class _PlaylistsTabState extends State<PlaylistsTab> {
               itemBuilder: (context, index) {
                 final playlist = _playlists[index];
                 return ListTile(
-                  leading: const Icon(Icons.playlist_play),
+                  leading: Icon(
+                    playlist.isFavourite
+                        ? Icons.favorite
+                        : Icons.playlist_play,
+                  ),
                   title: Text(playlist.name),
                   subtitle: Text('${playlist.songs.length} songs'),
-                  trailing: playlist.isFavourite
-                      ? null
-                      : IconButton(
-                          icon: const Icon(Icons.delete),
-                          onPressed: () => _deletePlaylist(index),
-                        ),
                   onTap: () {
                     Navigator.push(
                       context,
@@ -463,6 +640,7 @@ class _PlaylistsTabState extends State<PlaylistsTab> {
                       ),
                     );
                   },
+                  onLongPress: () => _confirmDeletePlaylist(index),
                 );
               },
             ),
