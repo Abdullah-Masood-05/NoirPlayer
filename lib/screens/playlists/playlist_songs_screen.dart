@@ -1,296 +1,3 @@
-// lib/screens/playlists/playlist_songs_screen.dart
-// import 'package:flutter/material.dart';
-// import '../../core/models/playlist_model.dart';
-// import 'package:noir_player/core/services/audio_handler.dart';
-// import 'package:on_audio_query/on_audio_query.dart' hide PlaylistModel;
-
-// class PlaylistSongsScreen extends StatefulWidget {
-//   final PlaylistModel playlist;
-//   final VoidCallback onUpdate; // call this to save updates in parent
-
-//   const PlaylistSongsScreen({
-//     super.key,
-//     required this.playlist,
-//     required this.onUpdate,
-//   });
-
-//   @override
-//   State<PlaylistSongsScreen> createState() => _PlaylistSongsScreenState();
-// }
-
-// class _PlaylistSongsScreenState extends State<PlaylistSongsScreen> {
-//   void _playSong(int index) async {
-//     final song = widget.playlist.songs[index];
-
-//     if (!isAudioServiceInitialized()) return;
-
-//     final handler = audioHandler as AudioPlayerHandler;
-
-//     // Just pass your playlist songs directly
-//     handler.setQueue(widget.playlist.songs);
-
-//     // Play the tapped song at the given index
-//     //await handler.playSongAt(index);
-
-//     await handler.playSongAt(index);
-
-//     // Navigate to player screen
-//     if (mounted) {
-//       Navigator.of(
-//         context,
-//       ).pushNamed('/player'); // or callback like in HomeScreen
-//     }
-//   }
-
-//   void _removeSong(int index) {
-//     setState(() {
-//       widget.playlist.songs.removeAt(index);
-//     });
-//     widget.onUpdate();
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     final songs = widget.playlist.songs;
-
-//     if (songs.isEmpty) {
-//       return Scaffold(
-//         appBar: AppBar(title: Text(widget.playlist.name)),
-//         body: const Center(child: Text('No songs in this playlist.')),
-//       );
-//     }
-
-//     return Scaffold(
-//       appBar: AppBar(title: Text(widget.playlist.name)),
-//       body: ListView.separated(
-//         itemCount: songs.length,
-//         separatorBuilder: (_, __) => const Divider(),
-//         itemBuilder: (context, index) {
-//           final song = songs[index];
-//           return ListTile(
-//             leading: const Icon(Icons.music_note),
-//             title: Text(song.title),
-//             subtitle: Text(song.artist),
-//             trailing: IconButton(
-//               icon: const Icon(Icons.remove_circle_outline),
-//               onPressed: () => _removeSong(index),
-//             ),
-//             onTap: () => _playSong(index),
-//           );
-//         },
-//       ),
-//     );
-//   }
-// }
-
-// lib/screens/playlist/playlist_songs_screen.dart
-
-// import 'package:flutter/material.dart';
-// import '../../core/models/playlist_model.dart';
-// import '../../core/services/audio_handler.dart';
-// import '../../screens/player/player_screen.dart';
-
-// class PlaylistSongsScreen extends StatefulWidget {
-//   final PlaylistModel playlist;
-//   final VoidCallback onNavigateToPlayer;
-//   final VoidCallback onUpdatePlaylist;
-
-//   const PlaylistSongsScreen({
-//     super.key,
-//     required this.playlist,
-//     required this.onNavigateToPlayer,
-//     required this.onUpdatePlaylist,
-//   });
-
-//   @override
-//   State<PlaylistSongsScreen> createState() => _PlaylistSongsScreenState();
-// }
-
-// class _PlaylistSongsScreenState extends State<PlaylistSongsScreen> {
-//   void _playSong(int index) {
-//     final handler = audioHandler as AudioPlayerHandler;
-//     handler.setQueue(
-//       widget.playlist.songs.map((s) {
-//         return s; // use PlaylistSong directly if AudioHandler supports it
-//       }).toList(),
-//     );
-//     handler.playSongAt(index);
-//     widget.onNavigateToPlayer();
-//   }
-
-//   void _removeSong(int index) {
-//     setState(() {
-//       widget.playlist.songs.removeAt(index);
-//     });
-//     widget.onUpdatePlaylist();
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     final songs = widget.playlist.songs;
-//     return Scaffold(
-//       appBar: AppBar(title: Text(widget.playlist.name)),
-//       body: songs.isEmpty
-//           ? const Center(child: Text('No songs in this playlist'))
-//           : ListView.separated(
-//               itemCount: songs.length,
-//               separatorBuilder: (_, __) => const Divider(),
-//               itemBuilder: (context, index) {
-//                 final song = songs[index];
-//                 return ListTile(
-//                   title: Text(song.title),
-//                   subtitle: Text(song.artist),
-//                   trailing: IconButton(
-//                     icon: const Icon(Icons.delete),
-//                     onPressed: () => _removeSong(index),
-//                   ),
-//                   onTap: () => _playSong(index),
-//                 );
-//               },
-//             ),
-//     );
-//   }
-// }
-
-
-
-
-
-
-// import 'package:flutter/material.dart';
-// import 'package:noir_player/screens/player/player_screen.dart';
-// import 'package:on_audio_query/on_audio_query.dart' as on_audio;
-// import '../../core/models/playlist_model.dart';
-// import '../../core/services/audio_handler.dart';
-
-// class PlaylistSongsScreen extends StatefulWidget {
-//   final PlaylistModel playlist;
-//   final VoidCallback onNavigateToPlayer;
-//   final VoidCallback onUpdatePlaylist;
-
-//   const PlaylistSongsScreen({
-//     super.key,
-//     required this.playlist,
-//     required this.onNavigateToPlayer,
-//     required this.onUpdatePlaylist,
-//   });
-
-//   @override
-//   State<PlaylistSongsScreen> createState() => _PlaylistSongsScreenState();
-// }
-
-// class _PlaylistSongsScreenState extends State<PlaylistSongsScreen> {
-//   void _playSong(int index) async {
-//     if (!mounted) return;
-//     Navigator.of(context).pop();
-//     Navigator.of(context)
-//         .push(MaterialPageRoute(builder: (_) => PlayerScreen()));
-
-//     final handler = audioHandler as AudioPlayerHandler;
-
-//     // Set the playlist queue
-//     handler.setQueue(widget.playlist.songs);
-
-//     // Play the selected song
-//     await handler.playSongAt(index);
-//   }
-
-//   Future<void> _confirmRemoveSong(int index) async {
-//     final song = widget.playlist.songs[index];
-
-//     final confirm = await showDialog<bool>(
-//       context: context,
-//       builder: (ctx) => AlertDialog(
-//         title: const Text('Remove Song'),
-//         content: Text('Are you sure you want to remove "${song.title}"?'),
-//         actions: [
-//           TextButton(
-//             onPressed: () => Navigator.pop(ctx, false),
-//             child: const Text('Cancel'),
-//           ),
-//           TextButton(
-//             onPressed: () => Navigator.pop(ctx, true),
-//             child: const Text(
-//               'Remove',
-//               style: TextStyle(color: Colors.red),
-//             ),
-//           ),
-//         ],
-//       ),
-//     );
-
-//     if (confirm == true) {
-//       setState(() {
-//         widget.playlist.songs.removeAt(index);
-//       });
-//       widget.onUpdatePlaylist();
-//     }
-//   }
-
-//   String _formatDuration(int milliseconds) {
-//     final seconds = (milliseconds / 1000).round();
-//     final minutes = seconds ~/ 60;
-//     final remaining = (seconds % 60).toString().padLeft(2, '0');
-//     return '$minutes:$remaining';
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     final songs = widget.playlist.songs;
-
-//     return Scaffold(
-//       appBar: AppBar(title: Text(widget.playlist.name)),
-//       body: songs.isEmpty
-//           ? const Center(child: Text('No songs in this playlist'))
-//           : ListView.separated(
-//               itemCount: songs.length,
-//               separatorBuilder: (_, __) => const Divider(),
-//               itemBuilder: (context, index) {
-//                 final song = songs[index];
-
-//                 return ListTile(
-//                   leading: on_audio.QueryArtworkWidget(
-//                     id: song.id,
-//                     type: on_audio.ArtworkType.AUDIO,
-//                     nullArtworkWidget: Container(
-//                       width: 50,
-//                       height: 50,
-//                       decoration: BoxDecoration(
-//                         color: Colors.grey[800],
-//                         borderRadius: BorderRadius.circular(8),
-//                       ),
-//                       child: const Icon(
-//                         Icons.music_note,
-//                         color: Colors.white54,
-//                       ),
-//                     ),
-//                   ),
-//                   title: Text(
-//                     song.title,
-//                     maxLines: 1,
-//                     overflow: TextOverflow.ellipsis,
-//                   ),
-//                   subtitle: Text(song.artist ?? 'Unknown Artist'),
-//                   trailing: Text(
-//                     _formatDuration(song.duration ?? 0),
-//                     style: const TextStyle(color: Colors.white60),
-//                   ),
-//                   onTap: () => _playSong(index),
-//                   onLongPress: () => _confirmRemoveSong(index),
-//                 );
-//               },
-//             ),
-//     );
-//   }
-// }
-
-
-
-
-
-
-
-
 import 'package:flutter/material.dart';
 import 'package:on_audio_query/on_audio_query.dart' as on_audio;
 import '../../core/models/playlist_model.dart';
@@ -317,8 +24,9 @@ class _PlaylistSongsScreenState extends State<PlaylistSongsScreen> {
   void _playSong(int index) async {
     if (!mounted) return;
     Navigator.of(context).pop();
-    Navigator.of(context)
-        .push(MaterialPageRoute(builder: (_) => PlayerScreen()));
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => PlayerScreen()));
 
     final handler = audioHandler as AudioPlayerHandler;
 
@@ -518,16 +226,16 @@ class _PlaylistSongsScreenState extends State<PlaylistSongsScreen> {
                     );
                   },
                   child: Card(
-                    color: isDark ? Colors.grey[850] : Colors.grey[100],
+                    color: isDark ? Colors.black : Colors.white,
                     margin: const EdgeInsets.symmetric(vertical: 6),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 10,
-                      ),
+                      // contentPadding: const EdgeInsets.symmetric(
+                      //   horizontal: 16,
+                      //   vertical: 10,
+                      // ),
                       leading: Hero(
                         tag: 'song_art_${song.id}',
                         child: ClipRRect(
@@ -543,7 +251,7 @@ class _PlaylistSongsScreenState extends State<PlaylistSongsScreen> {
                                 color: isDark
                                     ? Colors.grey[800]
                                     : Colors.grey[300],
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(1),
                               ),
                               child: Icon(
                                 Icons.music_note,
@@ -568,8 +276,9 @@ class _PlaylistSongsScreenState extends State<PlaylistSongsScreen> {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 13,
-                          color:
-                              theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+                          color: theme.textTheme.bodyMedium?.color?.withOpacity(
+                            0.7,
+                          ),
                         ),
                       ),
                       trailing: Container(

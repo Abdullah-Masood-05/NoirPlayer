@@ -1,209 +1,8 @@
-// import 'package:flutter/material.dart';
-
-// class AlbumsTab extends StatelessWidget {
-//   const AlbumsTab({super.key});
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return const Center(child: Text('Albums will appear here'));
-//   }
-// }
-
-// lib/tabs/albums_tab.dart
-
-// import 'package:flutter/material.dart';
-// import 'package:on_audio_query/on_audio_query.dart';
-// import 'package:noir_player/core/services/audio_handler.dart';
-
-// class AlbumsTab extends StatefulWidget {
-//   const AlbumsTab({super.key});
-
-//   @override
-//   State<AlbumsTab> createState() => _AlbumsTabState();
-// }
-
-// class _AlbumsTabState extends State<AlbumsTab> {
-//   final OnAudioQuery _audioQuery = OnAudioQuery();
-//   bool _permissionGranted = false;
-//   int? _expandedAlbumId;
-//   List<AlbumModel> _albums = [];
-//   bool _isLoading = true;
-//   String? _error;
-
-//   @override
-//   void initState() {
-//     super.initState();
-//     _checkAndRequestPermissions();
-//   }
-
-//   Future<void> _checkAndRequestPermissions() async {
-//     final granted = await _audioQuery.checkAndRequest(retryRequest: true);
-//     setState(() => _permissionGranted = granted);
-//     if (granted) _loadAlbums();
-//   }
-
-//   Future<void> _loadAlbums() async {
-//     try {
-//       final albums = await _audioQuery.queryAlbums();
-//       setState(() {
-//         _albums = albums;
-//         _isLoading = false;
-//       });
-//     } catch (e) {
-//       setState(() {
-//         _error = e.toString();
-//         _isLoading = false;
-//       });
-//     }
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     if (!_permissionGranted) {
-//       return const Center(
-//         child: Text(
-//           'Please grant storage/media permission to access albums.',
-//           textAlign: TextAlign.center,
-//         ),
-//       );
-//     }
-
-//     if (_isLoading) {
-//       return const Center(child: CircularProgressIndicator());
-//     }
-
-//     if (_error != null) {
-//       return Center(child: Text('Error loading albums: $_error'));
-//     }
-
-//     if (_albums.isEmpty) {
-//       return const Center(child: Text('No albums found on this device'));
-//     }
-
-//     return ListView.builder(
-//       itemCount: _albums.length,
-//       itemBuilder: (context, index) {
-//         final album = _albums[index];
-//         final isExpanded = _expandedAlbumId == album.id;
-
-//         return Column(
-//           children: [
-//             // 🎵 Album card
-//             ListTile(
-//               leading: QueryArtworkWidget(
-//                 id: album.id,
-//                 type: ArtworkType.ALBUM,
-//                 artworkBorder: BorderRadius.circular(8),
-//                 nullArtworkWidget: const Icon(Icons.album_rounded, size: 40),
-//               ),
-//               title: Text(
-//                 album.album,
-//                 maxLines: 1,
-//                 overflow: TextOverflow.ellipsis,
-//                 style: const TextStyle(fontWeight: FontWeight.bold),
-//               ),
-//               subtitle: Text(album.artist ?? 'Unknown Artist'),
-//               trailing: Icon(
-//                 isExpanded
-//                     ? Icons.keyboard_arrow_up
-//                     : Icons.keyboard_arrow_down,
-//               ),
-//               onTap: () {
-//                 setState(() {
-//                   // toggle expansion
-//                   if (mounted) {
-//                     ;
-//                     widget.onNavigateToPlayer();
-//                   }
-//                   _expandedAlbumId = isExpanded ? null : album.id;
-//                 });
-//               },
-//             ),
-
-//             // 🎧 Expanded song list
-//             if (isExpanded)
-//               FutureBuilder<List<SongModel>>(
-//                 future: _audioQuery.queryAudiosFrom(
-//                   AudiosFromType.ALBUM_ID,
-//                   album.id,
-//                 ),
-//                 builder: (context, songSnapshot) {
-//                   if (songSnapshot.connectionState == ConnectionState.waiting) {
-//                     return const Padding(
-//                       padding: EdgeInsets.all(12.0),
-//                       child: Center(child: CircularProgressIndicator()),
-//                     );
-//                   }
-
-//                   if (songSnapshot.hasError) {
-//                     return Padding(
-//                       padding: const EdgeInsets.all(8.0),
-//                       child: Text('Error: ${songSnapshot.error}'),
-//                     );
-//                   }
-
-//                   final songs = songSnapshot.data ?? [];
-//                   if (songs.isEmpty) {
-//                     return const Padding(
-//                       padding: EdgeInsets.all(8.0),
-//                       child: Text('No songs found in this album.'),
-//                     );
-//                   }
-
-//                   return ListView.separated(
-//                     shrinkWrap: true,
-//                     physics: const NeverScrollableScrollPhysics(),
-//                     itemCount: songs.length,
-//                     separatorBuilder: (_, __) =>
-//                         const Divider(indent: 72, endIndent: 12),
-//                     itemBuilder: (context, songIndex) {
-//                       final song = songs[songIndex];
-//                       return ListTile(
-//                         leading: QueryArtworkWidget(
-//                           id: song.id,
-//                           type: ArtworkType.AUDIO,
-//                           artworkBorder: BorderRadius.circular(6),
-//                           nullArtworkWidget: const Icon(
-//                             Icons.music_note,
-//                             size: 32,
-//                           ),
-//                         ),
-//                         title: Text(
-//                           song.title,
-//                           maxLines: 1,
-//                           overflow: TextOverflow.ellipsis,
-//                         ),
-//                         subtitle: Text(song.artist ?? 'Unknown Artist'),
-//                         onTap: () async {
-//                           final handler = audioHandler as AudioPlayerHandler;
-//                           handler.setQueue(songs);
-//                           await handler.playSongAt(songIndex);
-//                           ScaffoldMessenger.of(context).showSnackBar(
-//                             SnackBar(
-//                               content: Text('▶️ Playing: ${song.title}'),
-//                             ),
-//                           );
-//                         },
-//                       );
-//                     },
-//                   );
-//                 },
-//               ),
-
-//             const Divider(thickness: 1),
-//           ],
-//         );
-//       },
-//     );
-//   }
-// }
-
-// lib/tabs/albums_tab.dart
 import 'package:flutter/material.dart';
 import 'package:noir_player/screens/player/player_screen.dart';
 import 'package:on_audio_query/on_audio_query.dart';
-import 'package:noir_player/core/services/audio_handler.dart'; // <-- import your AudioService handler
-import '../../albums/album_songs_screen.dart'; // we'll create this next
+import 'package:noir_player/core/services/audio_handler.dart';
+import '../../albums/album_songs_screen.dart';
 
 class AlbumsTab extends StatefulWidget {
   const AlbumsTab({super.key});
@@ -229,11 +28,15 @@ class _AlbumsTabState extends State<AlbumsTab> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     if (!_permissionGranted) {
-      return const Center(
+      return Center(
         child: Text(
           'Please grant storage/media permission to access albums.',
           textAlign: TextAlign.center,
+          style: TextStyle(color: theme.textTheme.bodyMedium?.color),
         ),
       );
     }
@@ -246,97 +49,148 @@ class _AlbumsTabState extends State<AlbumsTab> {
         }
 
         if (snapshot.hasError) {
-          return Center(child: Text('Error loading albums: ${snapshot.error}'));
+          return Center(
+            child: Text(
+              'Error loading albums: ${snapshot.error}',
+              style: TextStyle(color: theme.textTheme.bodyMedium?.color),
+            ),
+          );
         }
 
         final albums = snapshot.data ?? [];
 
         if (albums.isEmpty) {
-          return const Center(child: Text('No albums found on this device'));
+          return Center(
+            child: Text(
+              'No albums found on this device',
+              style: TextStyle(color: theme.textTheme.bodyMedium?.color),
+            ),
+          );
         }
 
         return GridView.builder(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(16),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 0.9,
+            mainAxisSpacing: 16,
+            crossAxisSpacing: 16,
+            childAspectRatio: 0.75, 
           ),
           itemCount: albums.length,
           itemBuilder: (context, index) {
             final album = albums[index];
 
-            return GestureDetector(
-              onTap: () {
-                // ✅ Navigate to the album‑songs screen **and** provide the callback
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => AlbumSongsScreen(
-                      album: album,
-                      onNavigateToPlayer: () {
-                        // This is executed *inside* AlbumSongsScreen before playback.
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                const PlayerScreen(), // or whatever you use
-                          ),
-                        );
-                      },
-                    ),
-                  ),
+            return TweenAnimationBuilder<double>(
+              duration: Duration(milliseconds: 300 + (index * 50)),
+              tween: Tween(begin: 0.0, end: 1.0),
+              curve: Curves.easeOutCubic,
+              builder: (context, value, child) {
+                return Transform.scale(
+                  scale: 0.8 + (0.2 * value),
+                  child: Opacity(opacity: value, child: child),
                 );
               },
-              child: Card(
-                elevation: 3,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      child: QueryArtworkWidget(
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AlbumSongsScreen(
+                        album: album,
+                        onNavigateToPlayer: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const PlayerScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  );
+                },
+                child: Card(
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(50),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      QueryArtworkWidget(
                         id: album.id,
                         type: ArtworkType.ALBUM,
                         artworkFit: BoxFit.cover,
                         nullArtworkWidget: Container(
-                          color: Colors.grey[850],
-                          child: const Icon(
-                            Icons.album_rounded,
-                            size: 60,
-                            color: Colors.white54,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: isDark
+                                  ? [Colors.grey[850]!, Colors.grey[900]!]
+                                  : [Colors.grey[300]!, Colors.grey[400]!],
+                            ),
+                          ),
+                          child: Center(
+                            child: Icon(
+                              Icons.album_rounded,
+                              size: 80,
+                              color: isDark ? Colors.white24 : Colors.black26,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            album.album,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            album.artist ?? 'Unknown Artist',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
+                      Positioned(
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.transparent,
+                                Colors.black.withOpacity(0.7),
+                                Colors.black.withOpacity(0.85),
+                              ],
                             ),
                           ),
-                        ],
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 16,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                album.album,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                  color: Colors.white,
+                                  height: 1.2,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                album.artist ?? 'Unknown Artist',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.white.withOpacity(0.8),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             );
