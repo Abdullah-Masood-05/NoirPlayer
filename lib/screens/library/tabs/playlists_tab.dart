@@ -1,8 +1,6 @@
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
 import '../../../core/models/playlist_model.dart';
+import '../../../core/services/playlist_service.dart';
 import '../../playlists/playlist_songs_screen.dart';
 
 class PlaylistsTab extends StatefulWidget {
@@ -15,49 +13,15 @@ class PlaylistsTab extends StatefulWidget {
 }
 
 class _PlaylistsTabState extends State<PlaylistsTab> {
-  List<PlaylistModel> _playlists = [];
+  final PlaylistService _playlistService = PlaylistService();
 
   @override
   void initState() {
     super.initState();
-    _loadPlaylists();
   }
 
-  Future<File> get _localFile async {
-    final dir = await getApplicationDocumentsDirectory();
-    return File('${dir.path}/playlists.json');
-  }
-
-  Future<void> _loadPlaylists() async {
-    try {
-      final file = await _localFile;
-      if (await file.exists()) {
-        final content = await file.readAsString();
-        final jsonList = jsonDecode(content) as List<dynamic>;
-        setState(() {
-          _playlists = jsonList
-              .map((e) => PlaylistModel.fromJson(e as Map<String, dynamic>))
-              .toList();
-        });
-      } else {
-        final favorite =
-            PlaylistModel(name: 'Favorites', songs: [], isFavourite: true);
-        _playlists = [favorite];
-        await _savePlaylists();
-      }
-    } catch (e) {
-      debugPrint('Error loading playlists: $e');
-    }
-  }
-
-  Future<void> _savePlaylists() async {
-    final file = await _localFile;
-    await file
-        .writeAsString(jsonEncode(_playlists.map((p) => p.toJson()).toList()));
-  }
-
-  void _createPlaylist() {
-    if (_playlists.length >= 5) {
+  Future<void> _createPlaylist(List<PlaylistModel> playlists) async {
+    if (playlists.length >= 5) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Maximum 5 playlists allowed.')),
       );
@@ -74,7 +38,9 @@ class _PlaylistsTabState extends State<PlaylistsTab> {
         final isDark = theme.brightness == Brightness.dark;
 
         return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           elevation: 8,
           backgroundColor: theme.colorScheme.surface,
           child: Padding(
@@ -112,7 +78,9 @@ class _PlaylistsTabState extends State<PlaylistsTab> {
                 // Input
                 TextField(
                   controller: controller,
-                  decoration: const InputDecoration(hintText: 'Enter playlist name...'),
+                  decoration: const InputDecoration(
+                    hintText: 'Enter playlist name...',
+                  ),
                 ),
                 const SizedBox(height: 28),
 
@@ -128,7 +96,9 @@ class _PlaylistsTabState extends State<PlaylistsTab> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           side: BorderSide(
-                            color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                            color: isDark
+                                ? Colors.grey[700]!
+                                : Colors.grey[300]!,
                             width: 1.5,
                           ),
                         ),
@@ -145,14 +115,30 @@ class _PlaylistsTabState extends State<PlaylistsTab> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () {
+                        onPressed: () async {
                           final name = controller.text.trim();
                           if (name.isNotEmpty) {
-                            setState(() {
-                              _playlists.add(PlaylistModel(name: name, songs: []));
-                            });
-                            _savePlaylists();
-                            Navigator.pop(ctx);
+                            try {
+                              await _playlistService.createPlaylist(name: name);
+                              Navigator.pop(ctx);
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Playlist "$name" created'),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Error: $e'),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            }
                           }
                         },
                         style: ElevatedButton.styleFrom(
@@ -183,8 +169,7 @@ class _PlaylistsTabState extends State<PlaylistsTab> {
     );
   }
 
-  Future<void> _confirmDeletePlaylist(int index) async {
-    final playlist = _playlists[index];
+  Future<void> _confirmDeletePlaylist(PlaylistModel playlist) async {
     if (playlist.isFavourite) return; // cannot delete favourites
 
     final theme = Theme.of(context);
@@ -308,66 +293,92 @@ class _PlaylistsTabState extends State<PlaylistsTab> {
     );
 
     if (confirm == true) {
-      setState(() => _playlists.removeAt(index));
-      _savePlaylists();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Playlist "${playlist.name}" deleted'),
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
+      try {
+        await _playlistService.deletePlaylist(playlist.id!);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Playlist "${playlist.name}" deleted'),
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
-          ),
-        );
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error deleting playlist: $e'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      floatingActionButton: FloatingActionButton(
-        onPressed: _createPlaylist,
-        child: const Icon(Icons.add),
-      ),
-      body: _playlists.isEmpty
-          ? const Center(child: Text('No playlists yet'))
-          : ListView.separated(
-              itemCount: _playlists.length,
-              separatorBuilder: (_, __) => const Divider(),
-              itemBuilder: (context, index) {
-                final playlist = _playlists[index];
-                return ListTile(
-                  leading: Icon(
-                    playlist.isFavourite
-                        ? Icons.favorite
-                        : Icons.playlist_play,
-                  ),
-                  title: Text(playlist.name),
-                  subtitle: Text('${playlist.songs.length} songs'),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => PlaylistSongsScreen(
-                          playlist: playlist,
-                          onNavigateToPlayer: widget.onNavigateToPlayer,
-                          onUpdatePlaylist: () {
-                            setState(() {});
-                            _savePlaylists();
-                          },
-                        ),
+    return StreamBuilder<List<PlaylistModel>>(
+      stream: _playlistService.getPlaylistsStream(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Scaffold(
+            body: Center(child: Text('Error: ${snapshot.error}')),
+          );
+        }
+
+        final playlists = snapshot.data ?? [];
+
+        return Scaffold(
+          floatingActionButton: FloatingActionButton(
+            onPressed: () => _createPlaylist(playlists),
+            child: const Icon(Icons.add),
+          ),
+          body: playlists.isEmpty
+              ? const Center(child: Text('No playlists yet'))
+              : ListView.separated(
+                  itemCount: playlists.length,
+                  separatorBuilder: (_, __) => const Divider(),
+                  itemBuilder: (context, index) {
+                    final playlist = playlists[index];
+                    return ListTile(
+                      leading: Icon(
+                        playlist.isFavourite
+                            ? Icons.favorite
+                            : Icons.playlist_play,
                       ),
+                      title: Text(playlist.name),
+                      subtitle: Text('${playlist.songs.length} songs'),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => PlaylistSongsScreen(
+                              playlist: playlist,
+                              onNavigateToPlayer: widget.onNavigateToPlayer,
+                              onUpdatePlaylist: () {
+                                // No need to call setState, StreamBuilder handles updates
+                              },
+                            ),
+                          ),
+                        );
+                      },
+                      onLongPress: () => _confirmDeletePlaylist(playlist),
                     );
                   },
-                  onLongPress: () => _confirmDeletePlaylist(index),
-                );
-              },
-            ),
+                ),
+        );
+      },
     );
   }
 }
-
