@@ -12,19 +12,20 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final AuthService _authService = AuthService();
-  bool _isDark = true;
+  late ThemeMode _currentThemeMode;
 
   @override
   void initState() {
     super.initState();
-    _isDark = widget.themeNotifier.value == ThemeMode.dark;
+    _currentThemeMode = widget.themeNotifier.value;
   }
 
-  void _toggleTheme(bool value) {
+  void _changeThemeMode(ThemeMode? mode) {
+    if (mode == null) return;
     setState(() {
-      _isDark = value;
+      _currentThemeMode = mode;
     });
-    widget.themeNotifier.value = value ? ThemeMode.dark : ThemeMode.light;
+    widget.themeNotifier.value = mode;
   }
 
   Future<void> _confirmLogout() async {
@@ -163,11 +164,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         children: [
-          SwitchListTile(
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
+              'Theme',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.color?.withOpacity(0.7),
+              ),
+            ),
+          ),
+          RadioListTile<ThemeMode>(
+            title: const Text('System Default'),
+            subtitle: const Text('Follow device theme'),
+            value: ThemeMode.system,
+            groupValue: _currentThemeMode,
+            onChanged: _changeThemeMode,
+            secondary: const Icon(Icons.brightness_auto),
+          ),
+          RadioListTile<ThemeMode>(
+            title: const Text('Light Mode'),
+            subtitle: const Text('Always use light theme'),
+            value: ThemeMode.light,
+            groupValue: _currentThemeMode,
+            onChanged: _changeThemeMode,
+            secondary: const Icon(Icons.light_mode),
+          ),
+          RadioListTile<ThemeMode>(
             title: const Text('Dark Mode'),
-            value: _isDark,
-            onChanged: _toggleTheme,
-            secondary: const Icon(Icons.brightness_6),
+            subtitle: const Text('Always use dark theme'),
+            value: ThemeMode.dark,
+            groupValue: _currentThemeMode,
+            onChanged: _changeThemeMode,
+            secondary: const Icon(Icons.dark_mode),
           ),
           const Divider(),
           ListTile(
