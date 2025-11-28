@@ -186,29 +186,17 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       });
 
       if (savedUri != null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${track.name} downloaded successfully'),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-      } else {
-        throw Exception('Failed to save file');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${track.name} downloaded successfully'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     } catch (e) {
       setState(() {
         _downloadProgress.remove(trackKey);
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error downloading: $e'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
     }
   }
 

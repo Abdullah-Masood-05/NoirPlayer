@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../library/library_screen.dart';
 import '../player/player_screen.dart';
-import '../playlists/playlists_screen.dart';
 import '../settings/settings_screen.dart';
 import '../discover/discover_screen.dart';
 
@@ -20,7 +19,6 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<String> _titles = const [
     'Library',
     'Now Playing',
-    'Playlists',
     'Discover',
     'Settings',
   ];
@@ -42,7 +40,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final List<Widget> screens = [
       LibraryScreen(onNavigateToPlayer: _navigateToPlayer),
       const PlayerScreen(),
-      PlaylistsScreen(onNavigateToPlayer: _navigateToPlayer),
       const DiscoverScreen(),
       SettingsScreen(themeNotifier: widget.themeNotifier),
     ];
@@ -82,10 +79,6 @@ class _HomeScreenState extends State<HomeScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.music_note),
             label: 'Player',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.playlist_play),
-            label: 'Playlists',
           ),
           BottomNavigationBarItem(icon: Icon(Icons.explore), label: 'Discover'),
           BottomNavigationBarItem(
