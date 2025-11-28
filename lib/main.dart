@@ -2,11 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:noir_player/core/services/audio_handler.dart';
 import 'package:noir_player/screens/player/player_screen.dart';
+import 'package:noir_player/screens/auth/auth_wrapper.dart';
 import 'core/theme/app_theme.dart';
-import 'screens/home/home_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Firebase
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
   await initAudioService();
   timeDilation = 1.0;
   runApp(NoirPlayerApp());
@@ -15,7 +21,7 @@ void main() async {
 class NoirPlayerApp extends StatelessWidget {
   NoirPlayerApp({super.key});
 
-  final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
+  final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.system);
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +36,7 @@ class NoirPlayerApp extends StatelessWidget {
           themeMode: currentMode,
           initialRoute: '/',
           routes: {
-            '/': (context) => HomeScreen(themeNotifier: themeNotifier),
+            '/': (context) => AuthWrapper(themeNotifier: themeNotifier),
             '/player': (context) => const PlayerScreen(),
           },
         );
