@@ -13,10 +13,10 @@ class MusicDiscoveryService {
   factory MusicDiscoveryService() => _instance;
   MusicDiscoveryService._internal();
 
-  final String lastFmApiKey = 'ef0d88249c08f3cf35e88760552fc419';
-  final String youtubeApiKey = 'AIzaSyD3h69FaXDdbo6bAZEtFXupv-kaaidS3Js';
+  final String lastFmApiKey = '';
+  final String youtubeApiKey = '';
   final String rapidApiKey =
-      '536fcaede1msh8e3baed430bdfafp1f54a1jsn83918d2a7c9a';
+      '';
 
   static bool mediaStoreInitialized = false;
 
