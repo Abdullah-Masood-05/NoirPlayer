@@ -1,9 +1,8 @@
-
 import 'package:flutter/material.dart';
 import '../library/library_screen.dart';
 import '../player/player_screen.dart';
-import '../playlists/playlists_screen.dart';
 import '../settings/settings_screen.dart';
+import '../discover/discover_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final ValueNotifier<ThemeMode> themeNotifier;
@@ -20,7 +19,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<String> _titles = const [
     'Library',
     'Now Playing',
-    'Playlists',
+    'Discover',
     'Settings',
   ];
 
@@ -41,8 +40,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final List<Widget> screens = [
       LibraryScreen(onNavigateToPlayer: _navigateToPlayer),
       const PlayerScreen(),
-      PlaylistsScreen(onNavigateToPlayer: _navigateToPlayer),
-      SettingsScreen(themeNotifier: widget.themeNotifier), // 👈 FIXED HERE
+      const DiscoverScreen(),
+      SettingsScreen(themeNotifier: widget.themeNotifier),
     ];
 
     return Scaffold(
@@ -81,10 +80,7 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.music_note),
             label: 'Player',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.playlist_play),
-            label: 'Playlists',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.explore), label: 'Discover'),
           BottomNavigationBarItem(
             icon: Icon(Icons.settings),
             label: 'Settings',

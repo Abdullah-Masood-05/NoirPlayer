@@ -33,11 +33,14 @@ class PlaylistSong {
 }
 
 class PlaylistModel {
+  final String? id; // Firestore document ID
   final String name;
   List<PlaylistSong> songs;
   final bool isFavourite; // mark favorites
   final int maxSongs; // maximum allowed songs
+
   PlaylistModel({
+    this.id,
     required this.name,
     required this.songs,
     this.isFavourite = false,
@@ -45,6 +48,7 @@ class PlaylistModel {
   });
 
   Map<String, dynamic> toJson() => {
+    if (id != null) 'id': id,
     'name': name,
     'songs': songs.map((s) => s.toJson()).toList(),
     'isFavourite': isFavourite,
@@ -52,6 +56,7 @@ class PlaylistModel {
   };
 
   factory PlaylistModel.fromJson(Map<String, dynamic> json) => PlaylistModel(
+    id: json['id'],
     name: json['name'],
     songs: (json['songs'] as List<dynamic>)
         .map((e) => PlaylistSong.fromJson(e))
