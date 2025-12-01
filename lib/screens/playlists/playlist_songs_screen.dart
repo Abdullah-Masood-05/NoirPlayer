@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:on_audio_query/on_audio_query.dart' as on_audio;
 import '../../core/models/playlist_model.dart';
 import '../../core/services/audio_handler.dart';
-import '../../core/services/playlist_service.dart';
 import '../player/player_screen.dart';
 
 class PlaylistSongsScreen extends StatefulWidget {
@@ -22,8 +21,6 @@ class PlaylistSongsScreen extends StatefulWidget {
 }
 
 class _PlaylistSongsScreenState extends State<PlaylistSongsScreen> {
-  final PlaylistService _playlistService = PlaylistService();
-
   void _playSong(int index) async {
     if (!mounted) return;
     Navigator.of(context).pop();
@@ -163,41 +160,22 @@ class _PlaylistSongsScreenState extends State<PlaylistSongsScreen> {
     );
 
     if (confirm == true) {
-      try {
-        // Remove song from local list and update UI immediately
-        setState(() {
-          widget.playlist.songs.removeAt(index);
-        });
+      setState(() {
+        widget.playlist.songs.removeAt(index);
+      });
+      widget.onUpdatePlaylist();
 
-        // Update Firebase with the new song list
-        await _playlistService.updatePlaylist(
-          playlistId: widget.playlist.id!,
-          playlist: widget.playlist,
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Removed "${song.title}" from playlist'),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
         );
-
-        widget.onUpdatePlaylist();
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Removed "${song.title}" from playlist'),
-              duration: const Duration(seconds: 2),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error removing song: $e'),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
       }
     }
   }
