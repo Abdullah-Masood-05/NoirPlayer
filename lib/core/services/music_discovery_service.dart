@@ -15,8 +15,7 @@ class MusicDiscoveryService {
 
   final String lastFmApiKey = '';
   final String youtubeApiKey = '';
-  final String rapidApiKey =
-      '';
+  final String rapidApiKey = '';
 
   static bool mediaStoreInitialized = false;
 
