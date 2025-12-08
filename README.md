@@ -1,12 +1,11 @@
 # Noir Player
 
-> **Noir Player** is a lightweight Flutter music player that demonstrates how to:
-> - Initialise the Android audio service with background playback support  
-> - Query the device’s media library using **`on_audio_query`**  
-> - Play, pause, stop and show the current media item in a dedicated “Now Playing” screen  
-> - Keep the UI responsive with `StreamBuilder`s  
+ **Noir Player** is a lightweight Flutter music player that demonstrates how to:
+ - Initialise the Android audio service with background playback support  
+ - Query the device’s media library using **`on_audio_query`**  
+ - Play, pause, stop and show the current media item in a dedicated “Now Playing” screen  
+ - Keep the UI responsive with `StreamBuilder`s  
 
-> The project is a good starting point if you want to build a full‑featured music app or add your own custom playback logic.
 
 ---
 
