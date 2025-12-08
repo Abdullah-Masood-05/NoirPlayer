@@ -15,7 +15,9 @@ void main() async {
 class NoirPlayerApp extends StatelessWidget {
   NoirPlayerApp({super.key});
 
-  final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
+  final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(
+    ThemeMode.system,
+  );
 
   @override
   Widget build(BuildContext context) {
