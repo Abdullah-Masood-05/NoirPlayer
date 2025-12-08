@@ -4,7 +4,7 @@
  - Initialise the Android audio service with background playback support  
  - Query the device’s media library using **`on_audio_query`**  
  - Play, pause, stop and show the current media item in a dedicated “Now Playing” screen  
- - Keep the UI responsive with `StreamBuilder`s  
+ - Keep the UI responsive with `StreamBuilders`  
 
 
 ---
