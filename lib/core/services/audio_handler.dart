@@ -60,6 +60,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
   static const _kLastSong = 'playback.lastSong';
 
   Stream<Duration> get positionStream => _player.positionStream;
+  Stream<Duration?> get durationStream => _player.durationStream;
 
   AudioPlayerHandler() {
     _player.setLoopMode(LoopMode.all);
@@ -97,13 +98,17 @@ class AudioPlayerHandler extends BaseAudioHandler {
       },
       onError: (Object e, StackTrace st) => debugPrint('❌ duration error: $e'),
     );
+
+    // Reflect loop / shuffle changes in the published state immediately.
+    _player.loopModeStream.listen((_) => _broadcastState());
+    _player.shuffleModeEnabledStream.listen((_) => _broadcastState());
   }
 
   // ---------------------------------------------------------------------------
   // Playback state broadcasting
   // ---------------------------------------------------------------------------
 
-  void _broadcastState(PlaybackEvent event) {
+  void _broadcastState([PlaybackEvent? event]) {
     final playing = _player.playing;
     final showSeek = SettingsService.instance.seekButtonsInNotification;
 
@@ -142,7 +147,11 @@ class AudioPlayerHandler extends BaseAudioHandler {
         updatePosition: _player.position,
         bufferedPosition: _player.bufferedPosition,
         speed: _player.speed,
-        queueIndex: event.currentIndex,
+        repeatMode: _repeatMode(),
+        shuffleMode: _player.shuffleModeEnabled
+            ? AudioServiceShuffleMode.all
+            : AudioServiceShuffleMode.none,
+        queueIndex: event?.currentIndex ?? _player.currentIndex,
       ),
     );
   }
@@ -289,9 +298,88 @@ class AudioPlayerHandler extends BaseAudioHandler {
     await playSongAt(0);
   }
 
+  /// Play a remote stream (e.g. a Discover track) through the main player, so it
+  /// appears in the player, mini-player and notification and is fully
+  /// controllable.
+  Future<void> playStream({
+    required String id,
+    required String url,
+    required String title,
+    required String artist,
+    String? artUri,
+  }) async {
+    final item = MediaItem(
+      id: id,
+      title: title,
+      artist: artist,
+      album: 'Discover',
+      artUri: (artUri != null && artUri.isNotEmpty)
+          ? Uri.tryParse(artUri)
+          : null,
+    );
+    _songs = [];
+    _sourceMatchesQueue = false;
+    queue.add([item]);
+    mediaItem.add(item);
+    await _player.setAudioSources(
+      [AudioSource.uri(Uri.parse(url), tag: item)],
+      initialIndex: 0,
+      initialPosition: Duration.zero,
+    );
+    _playIntent = true;
+    await _player.play();
+  }
+
   Future<void> playNext() => _player.seekToNext();
 
   Future<void> playPrevious() => _player.seekToPrevious();
+
+  // ---------------------------------------------------------------------------
+  // Repeat / shuffle
+  // ---------------------------------------------------------------------------
+
+  Stream<LoopMode> get loopModeStream => _player.loopModeStream;
+  Stream<bool> get shuffleModeStream => _player.shuffleModeEnabledStream;
+  LoopMode get loopMode => _player.loopMode;
+  bool get shuffleEnabled => _player.shuffleModeEnabled;
+
+  /// Cycle repeat mode: all → one → off → all.
+  Future<void> cycleRepeatMode() {
+    final next = switch (_player.loopMode) {
+      LoopMode.all => LoopMode.one,
+      LoopMode.one => LoopMode.off,
+      LoopMode.off => LoopMode.all,
+    };
+    return _player.setLoopMode(next);
+  }
+
+  Future<void> toggleShuffle() async {
+    final enabled = !_player.shuffleModeEnabled;
+    if (enabled) await _player.shuffle();
+    await _player.setShuffleModeEnabled(enabled);
+  }
+
+  AudioServiceRepeatMode _repeatMode() => switch (_player.loopMode) {
+    LoopMode.off => AudioServiceRepeatMode.none,
+    LoopMode.one => AudioServiceRepeatMode.one,
+    LoopMode.all => AudioServiceRepeatMode.all,
+  };
+
+  @override
+  Future<void> setRepeatMode(AudioServiceRepeatMode repeatMode) {
+    return _player.setLoopMode(switch (repeatMode) {
+      AudioServiceRepeatMode.none => LoopMode.off,
+      AudioServiceRepeatMode.one => LoopMode.one,
+      _ => LoopMode.all,
+    });
+  }
+
+  @override
+  Future<void> setShuffleMode(AudioServiceShuffleMode shuffleMode) async {
+    final enabled = shuffleMode != AudioServiceShuffleMode.none;
+    if (enabled) await _player.shuffle();
+    await _player.setShuffleModeEnabled(enabled);
+  }
 
   // ---------------------------------------------------------------------------
   // audio_service overrides (notification / lock screen / system media)

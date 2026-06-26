@@ -1,10 +1,16 @@
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
-import 'package:just_audio/just_audio.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+
 import '../../core/models/discovered_track.dart';
+import '../../core/services/audio_handler.dart';
 import '../../core/services/music_discovery_service.dart';
+import '../../widgets/now_playing_indicator.dart';
 
 class DiscoverScreen extends StatefulWidget {
-  const DiscoverScreen({super.key});
+  const DiscoverScreen({super.key, required this.onNavigateToPlayer});
+
+  final VoidCallback onNavigateToPlayer;
 
   @override
   State<DiscoverScreen> createState() => _DiscoverScreenState();
@@ -13,22 +19,18 @@ class DiscoverScreen extends StatefulWidget {
 class _DiscoverScreenState extends State<DiscoverScreen> {
   final MusicDiscoveryService _discoveryService = MusicDiscoveryService();
   final TextEditingController _searchController = TextEditingController();
-  final AudioPlayer _player = AudioPlayer();
 
   List<DiscoveredTrack> _tracks = [];
   bool _isLoading = true;
   bool _isSearching = false;
-  String? _currentlyPlayingTrack; // "trackName-artistName"
-  bool _isPlaying = false;
-  String? _loadingTrack; // Track being loaded
-  final Map<String, double> _downloadProgress =
-      {}; // "trackName-artistName" -> progress
+  String? _loadingTrack;
+  final Map<String, double> _downloadProgress = {};
+
+  String _keyFor(DiscoveredTrack t) => '${t.name}-${t.artist}';
 
   @override
   void initState() {
     super.initState();
-    // Load which tracks were already downloaded so we can show their state
-    // and prevent downloading the same song twice.
     _discoveryService.loadDownloadedKeys().then((_) {
       if (mounted) setState(() {});
     });
@@ -37,7 +39,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
   @override
   void dispose() {
-    _player.dispose();
     _searchController.dispose();
     _discoveryService.dispose();
     super.dispose();
@@ -61,16 +62,14 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   }
 
   Future<void> _searchSongs(String query) async {
-    if (query.isEmpty) {
+    if (query.trim().isEmpty) {
       _loadTrending();
       return;
     }
-
     setState(() {
       _isLoading = true;
       _isSearching = true;
     });
-
     try {
       final tracks = await _discoveryService.searchTracks(query);
       if (!mounted) return;
@@ -86,83 +85,58 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   }
 
   Future<void> _playTrack(DiscoveredTrack track) async {
-    final trackKey = '${track.name}-${track.artist}';
-
-    // Toggle play/pause if same track
-    if (_currentlyPlayingTrack == trackKey) {
-      if (_isPlaying) {
-        await _player.pause();
-        setState(() => _isPlaying = false);
-      } else {
-        await _player.play();
-        setState(() => _isPlaying = true);
-      }
-      return;
-    }
-
-    // Load new track
-    await _player.stop();
-
+    final key = _keyFor(track);
+    setState(() => _loadingTrack = key);
     try {
-      setState(() => _loadingTrack = trackKey);
-
       final videoId = await _discoveryService.fetchYoutubeVideoId(
         track.name,
         track.artist,
       );
-
-      if (videoId.isEmpty) {
-        throw Exception('No video found');
-      }
+      if (videoId.isEmpty) throw Exception('No source found');
 
       final mp3Url = await _discoveryService.getDownloadUrl(videoId);
-
       if (mp3Url == null || mp3Url.isEmpty) {
         throw Exception('No stream URL found');
       }
 
-      await _player.setUrl(mp3Url);
+      // Play through the main player so it shows in the player / mini-player /
+      // notification and is fully controllable.
+      await (audioHandler as AudioPlayerHandler).playStream(
+        id: 'discover:$key',
+        url: mp3Url,
+        title: track.name,
+        artist: track.artist,
+        artUri: track.imageUrl,
+      );
       if (!mounted) return;
-      setState(() {
-        _loadingTrack = null;
-        _isPlaying = true;
-        _currentlyPlayingTrack = trackKey;
-      });
-      await _player.play();
+      setState(() => _loadingTrack = null);
+      widget.onNavigateToPlayer();
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _loadingTrack = null;
-        _currentlyPlayingTrack = null;
-        _isPlaying = false;
-      });
+      setState(() => _loadingTrack = null);
       _showSnack('Error playing track: $e');
     }
   }
 
   Future<void> _downloadTrack(DiscoveredTrack track) async {
-    final trackKey = _discoveryService.trackKey(track);
-
-    // Don't download something that's already saved or in progress.
-    if (_discoveryService.isDownloaded(trackKey)) {
+    final key = _keyFor(track);
+    if (_discoveryService.isDownloaded(key)) {
       _showSnack('${track.name} is already downloaded');
       return;
     }
-    if (_downloadProgress.containsKey(trackKey)) return;
+    if (_downloadProgress.containsKey(key)) return;
 
-    setState(() => _downloadProgress[trackKey] = 0.0);
-
+    setState(() => _downloadProgress[key] = 0.0);
     final result = await _discoveryService.downloadTrack(
       track,
       onProgress: (received, total) {
         if (total > 0 && mounted) {
-          setState(() => _downloadProgress[trackKey] = received / total);
+          setState(() => _downloadProgress[key] = received / total);
         }
       },
     );
-
     if (!mounted) return;
-    setState(() => _downloadProgress.remove(trackKey));
+    setState(() => _downloadProgress.remove(key));
 
     switch (result) {
       case DownloadResult.success:
@@ -178,17 +152,14 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         _showSnack('Failed to download ${track.name}');
         break;
       case DownloadResult.inProgress:
-        break; // already downloading; no message needed
+        break;
     }
   }
 
   void _showSnack(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-      ),
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );
   }
 
@@ -197,185 +168,227 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: TextField(
-          controller: _searchController,
-          style: TextStyle(color: theme.textTheme.bodyLarge?.color),
-          decoration: InputDecoration(
-            hintText: 'Search songs...',
-            hintStyle: TextStyle(
-              color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.5),
-            ),
-            border: InputBorder.none,
-            suffixIcon: _searchController.text.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(Icons.clear),
-                    onPressed: () {
-                      _searchController.clear();
-                      _loadTrending();
-                    },
-                  )
-                : IconButton(
-                    icon: const Icon(Icons.search),
-                    onPressed: () => _searchSongs(_searchController.text),
-                  ),
+      body: Column(
+        children: [
+          _searchBar(theme),
+          Expanded(child: _content(theme)),
+        ],
+      ),
+    );
+  }
+
+  Widget _searchBar(ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+      child: TextField(
+        controller: _searchController,
+        textInputAction: TextInputAction.search,
+        onSubmitted: _searchSongs,
+        onChanged: (_) => setState(() {}),
+        decoration: InputDecoration(
+          hintText: 'Search songs, artists…',
+          prefixIcon: const Icon(Icons.search),
+          suffixIcon: _searchController.text.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: () {
+                    _searchController.clear();
+                    _loadTrending();
+                  },
+                )
+              : null,
+          filled: true,
+          fillColor: theme.colorScheme.surface,
+          contentPadding: const EdgeInsets.symmetric(vertical: 0),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(28),
+            borderSide: BorderSide.none,
           ),
-          textInputAction: TextInputAction.search,
-          onSubmitted: _searchSongs,
-          onChanged: (value) => setState(() {}),
         ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _tracks.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.music_off,
-                    size: 64,
-                    color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.3),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    _isSearching ? 'No results found' : 'No tracks available',
-                    style: TextStyle(
-                      color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 
-                        0.6,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : ListView.builder(
-              itemCount: _tracks.length,
-              padding: const EdgeInsets.all(8),
-              itemBuilder: (context, index) {
-                final track = _tracks[index];
-                final trackKey = '${track.name}-${track.artist}';
-                final isCurrentTrack = _currentlyPlayingTrack == trackKey;
-                final isLoading = _loadingTrack == trackKey;
-                final downloadProgress = _downloadProgress[trackKey];
-                final isDownloaded = _discoveryService.isDownloaded(trackKey);
+    );
+  }
 
-                return Card(
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  child: ListTile(
-                    leading: track.imageUrl.isNotEmpty
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: Image.network(
-                              track.imageUrl,
-                              width: 56,
-                              height: 56,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
-                                width: 56,
-                                height: 56,
-                                color: theme.colorScheme.primary.withValues(alpha: 
-                                  0.1,
-                                ),
-                                child: Icon(
-                                  Icons.music_note,
-                                  color: theme.colorScheme.primary,
-                                ),
-                              ),
-                            ),
-                          )
-                        : Container(
-                            width: 56,
-                            height: 56,
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Icon(
-                              Icons.music_note,
-                              color: theme.colorScheme.primary,
-                            ),
-                          ),
-                    title: Text(
-                      track.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontWeight: isCurrentTrack
-                            ? FontWeight.bold
-                            : FontWeight.normal,
-                        color: isCurrentTrack
-                            ? theme.colorScheme.primary
-                            : null,
-                      ),
-                    ),
-                    subtitle: Text(
-                      track.artist,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
+  Widget _content(ThemeData theme) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_tracks.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.music_off,
+              size: 64,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.25),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _isSearching ? 'No results found' : 'No tracks available',
+              style: theme.textTheme.bodyMedium,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(8, 4, 8, 88),
+      itemCount: _tracks.length + 1,
+      itemBuilder: (context, i) {
+        if (i == 0) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+            child: Row(
+              children: [
+                Icon(
+                  _isSearching ? Icons.search : Icons.trending_up,
+                  size: 20,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _isSearching ? 'Results' : 'Trending now',
+                  style: theme.textTheme.titleMedium,
+                ),
+              ],
+            ),
+          );
+        }
+        final index = i - 1;
+        return _trackCard(_tracks[index], index, theme);
+      },
+    );
+  }
+
+  Widget _trackCard(DiscoveredTrack track, int index, ThemeData theme) {
+    final key = _keyFor(track);
+    final isLoading = _loadingTrack == key;
+    final progress = _downloadProgress[key];
+    final isDownloaded = _discoveryService.isDownloaded(key);
+    final primary = theme.colorScheme.primary;
+
+    return StreamBuilder<MediaItem?>(
+      stream: audioHandler.mediaItem,
+      builder: (context, snap) {
+        final isCurrent = snap.data?.id == 'discover:$key';
+        return Card(
+          child: InkWell(
+            onTap: isLoading
+                ? null
+                : isCurrent
+                ? widget.onNavigateToPlayer
+                : () => _playTrack(track),
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Row(
+                children: [
+                  _artwork(track, theme),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Play/Pause button
-                        IconButton(
-                          icon: isLoading
-                              ? const SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : Icon(
-                                  isCurrentTrack && _isPlaying
-                                      ? Icons.pause_circle_filled
-                                      : Icons.play_circle_filled,
-                                  color: isCurrentTrack
-                                      ? theme.colorScheme.primary
-                                      : null,
-                                ),
-                          onPressed: isLoading ? null : () => _playTrack(track),
+                        Text(
+                          track.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontSize: 15,
+                            color: isCurrent ? primary : null,
+                            fontWeight: isCurrent
+                                ? FontWeight.bold
+                                : FontWeight.w500,
+                          ),
                         ),
-                        // Download button
-                        SizedBox(
-                          width: 48,
-                          height: 48,
-                          child: downloadProgress != null
-                              ? Center(
-                                  child: CircularProgressIndicator(
-                                    // Indeterminate until the first bytes arrive.
-                                    value: downloadProgress > 0
-                                        ? downloadProgress
-                                        : null,
-                                    strokeWidth: 4,
-                                  ),
-                                )
-                              : isDownloaded
-                              ? IconButton(
-                                  tooltip: 'Already downloaded',
-                                  icon: const Icon(
-                                    Icons.download_done,
-                                    color: Colors.green,
-                                  ),
-                                  onPressed: () => _showSnack(
-                                    '${track.name} is already downloaded',
-                                  ),
-                                )
-                              : IconButton(
-                                  tooltip: 'Download',
-                                  icon: const Icon(Icons.download),
-                                  onPressed: () => _downloadTrack(track),
-                                ),
+                        const SizedBox(height: 2),
+                        Text(
+                          track.artist,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall,
                         ),
                       ],
                     ),
                   ),
-                );
-              },
+                  SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: Center(
+                      child: isLoading
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : isCurrent
+                          ? NowPlayingIndicator(color: primary, size: 20)
+                          : IconButton(
+                              icon: Icon(
+                                Icons.play_circle_fill,
+                                color: primary,
+                                size: 34,
+                              ),
+                              onPressed: () => _playTrack(track),
+                            ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: Center(
+                      child: progress != null
+                          ? CircularProgressIndicator(
+                              value: progress > 0 ? progress : null,
+                              strokeWidth: 3,
+                            )
+                          : isDownloaded
+                          ? IconButton(
+                              tooltip: 'Downloaded',
+                              icon: const Icon(
+                                Icons.download_done,
+                                color: Colors.green,
+                              ),
+                              onPressed: () =>
+                                  _showSnack('${track.name} is already downloaded'),
+                            )
+                          : IconButton(
+                              tooltip: 'Download',
+                              icon: const Icon(Icons.download_outlined),
+                              onPressed: () => _downloadTrack(track),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ).animate().fadeIn(duration: 250.ms, delay: (index * 35).ms).slideX(
+              begin: 0.06,
+              curve: Curves.easeOut,
+            );
+      },
+    );
+  }
+
+  Widget _artwork(DiscoveredTrack track, ThemeData theme) {
+    final placeholder = Container(
+      width: 56,
+      height: 56,
+      color: theme.colorScheme.primary.withValues(alpha: 0.12),
+      child: Icon(Icons.music_note, color: theme.colorScheme.primary),
+    );
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: track.imageUrl.isEmpty
+          ? placeholder
+          : Image.network(
+              track.imageUrl,
+              width: 56,
+              height: 56,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => placeholder,
             ),
     );
   }

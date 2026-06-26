@@ -3,11 +3,10 @@ import 'dart:typed_data';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:just_audio/just_audio.dart' show LoopMode;
 import 'package:on_audio_query/on_audio_query.dart';
 
 import '../../core/services/audio_handler.dart';
-import '../../core/services/settings_service.dart';
-import '../../widgets/playback_menus.dart';
 
 class PlayerScreen extends StatefulWidget {
   const PlayerScreen({super.key});
@@ -23,6 +22,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
   // re-decoded / flashed) on every rebuild — e.g. each time play/pause toggles.
   int? _artSongId;
   Future<Uint8List?>? _artFuture;
+
+  AudioPlayerHandler get _handler => audioHandler as AudioPlayerHandler;
 
   Future<Uint8List?> _artworkFor(int songId) {
     if (_artSongId != songId || _artFuture == null) {
@@ -42,105 +43,82 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
 
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        actions: [
-          ListenableBuilder(
-            listenable: SettingsService.instance,
-            builder: (context, _) => TextButton(
-              onPressed: () => showPlaybackSpeedSheet(context),
-              child: Text(
-                formatSpeed(SettingsService.instance.playbackSpeed),
-                style: TextStyle(
-                  color: theme.colorScheme.onSurface,
-                  fontWeight: FontWeight.bold,
+    return StreamBuilder<MediaItem?>(
+      stream: audioHandler.mediaItem,
+      builder: (context, snapshot) {
+        final mediaItem = snapshot.data;
+
+        if (mediaItem == null) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.music_note,
+                  size: 72,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.25),
                 ),
-              ),
+                const SizedBox(height: 16),
+                Text(
+                  'No song is currently playing',
+                  style: theme.textTheme.bodyMedium,
+                ),
+              ],
             ),
-          ),
-          IconButton(
-            tooltip: 'Sleep timer',
-            icon: const Icon(Icons.bedtime_outlined),
-            onPressed: () => showSleepTimerSheet(context),
-          ),
-        ],
-      ),
-      body: StreamBuilder<MediaItem?>(
-        stream: audioHandler.mediaItem,
-        builder: (context, snapshot) {
-          final mediaItem = snapshot.data;
-
-          if (mediaItem == null) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.music_note,
-                    size: 72,
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.25),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No song is currently playing',
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                ],
-              ),
-            );
-          }
-
-          final songId = int.tryParse(mediaItem.id);
-          final artSize = (MediaQuery.sizeOf(context).width - 96).clamp(
-            180.0,
-            330.0,
           );
+        }
 
-          return Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  primary.withValues(alpha: 0.22),
-                  theme.scaffoldBackgroundColor,
-                  theme.scaffoldBackgroundColor,
-                ],
-                stops: const [0.0, 0.55, 1.0],
-              ),
+        final songId = int.tryParse(mediaItem.id);
+        final artSize = (MediaQuery.sizeOf(context).width - 96).clamp(
+          180.0,
+          330.0,
+        );
+
+        return Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                primary.withValues(alpha: 0.28),
+                theme.scaffoldBackgroundColor,
+                theme.scaffoldBackgroundColor,
+              ],
+              stops: const [0.0, 0.55, 1.0],
             ),
-            child: SafeArea(
-              child: Column(
-                children: [
-                  Expanded(
-                    child: Center(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            _Artwork(
-                              key: ValueKey(songId),
-                              size: artSize,
-                              future: songId != null ? _artworkFor(songId) : null,
-                            ),
-                            const SizedBox(height: 40),
-                            _trackInfo(mediaItem, theme),
-                          ],
-                        ),
+          ),
+          child: SafeArea(
+            child: Column(
+              children: [
+                // Clear the transparent app bar that the home shell draws over
+                // this gradient.
+                const SizedBox(height: kToolbarHeight),
+                Expanded(
+                  child: Center(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _Artwork(
+                            key: ValueKey(mediaItem.id),
+                            size: artSize,
+                            future: songId != null ? _artworkFor(songId) : null,
+                            artUri: mediaItem.artUri,
+                          ),
+                          const SizedBox(height: 40),
+                          _trackInfo(mediaItem, theme),
+                        ],
                       ),
                     ),
                   ),
-                  _controls(mediaItem, theme),
-                ],
-              ),
+                ),
+                _controls(mediaItem, theme),
+              ],
             ),
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -188,67 +166,79 @@ class _PlayerScreenState extends State<PlayerScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Progress slider + times
-            StreamBuilder<Duration>(
-              stream: (audioHandler as AudioPlayerHandler).positionStream,
-              builder: (context, positionSnapshot) {
-                final position = positionSnapshot.data ?? Duration.zero;
-                final total = mediaItem.duration ?? Duration.zero;
-                final maxMs = total.inMilliseconds > 0
-                    ? total.inMilliseconds.toDouble()
-                    : 1.0;
-                final value = position.inMilliseconds
-                    .clamp(0, total.inMilliseconds)
-                    .toDouble();
+            // Progress slider + times. The total comes from just_audio's live
+            // duration (falling back to the MediaItem) so streamed tracks work;
+            // seeking is disabled until the duration is known to avoid
+            // accidental restarts.
+            StreamBuilder<Duration?>(
+              stream: _handler.durationStream,
+              builder: (context, durationSnapshot) {
+                final total =
+                    durationSnapshot.data ?? mediaItem.duration ?? Duration.zero;
+                final totalMs = total.inMilliseconds;
+                final hasDuration = totalMs > 0;
 
-                return Column(
-                  children: [
-                    SliderTheme(
-                      data: SliderTheme.of(context).copyWith(
-                        trackShape: const RoundedRectSliderTrackShape(),
-                      ),
-                      child: Slider(
-                        min: 0,
-                        max: maxMs,
-                        value: value > maxMs ? maxMs : value,
-                        onChanged: (v) => (audioHandler as AudioPlayerHandler)
-                            .seek(Duration(milliseconds: v.toInt())),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            _formatDuration(position),
-                            style: theme.textTheme.bodySmall,
+                return StreamBuilder<Duration>(
+                  stream: _handler.positionStream,
+                  builder: (context, positionSnapshot) {
+                    final position = positionSnapshot.data ?? Duration.zero;
+                    final value = hasDuration
+                        ? position.inMilliseconds.clamp(0, totalMs).toDouble()
+                        : 0.0;
+
+                    return Column(
+                      children: [
+                        SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
+                            trackShape: const RoundedRectSliderTrackShape(),
                           ),
-                          Text(
-                            _formatDuration(total),
-                            style: theme.textTheme.bodySmall,
+                          child: Slider(
+                            min: 0,
+                            max: hasDuration ? totalMs.toDouble() : 1.0,
+                            value: value,
+                            onChanged: hasDuration
+                                ? (v) => _handler.seek(
+                                    Duration(milliseconds: v.toInt()),
+                                  )
+                                : null,
                           ),
-                        ],
-                      ),
-                    ),
-                  ],
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                _formatDuration(position),
+                                style: theme.textTheme.bodySmall,
+                              ),
+                              Text(
+                                hasDuration ? _formatDuration(total) : '--:--',
+                                style: theme.textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 );
               },
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
 
-            // Playback buttons
+            // Shuffle · prev · play/pause · next · repeat
             StreamBuilder<PlaybackState>(
               stream: audioHandler.playbackState,
               builder: (context, snapshot) {
                 final playing = snapshot.data?.playing ?? false;
                 return Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
+                    _shuffleButton(theme),
                     _ghostButton(
                       icon: Icons.skip_previous_rounded,
-                      onPressed: () =>
-                          (audioHandler as AudioPlayerHandler).playPrevious(),
+                      onPressed: _handler.playPrevious,
                     ),
                     _PlayPauseButton(
                       playing: playing,
@@ -258,9 +248,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     ),
                     _ghostButton(
                       icon: Icons.skip_next_rounded,
-                      onPressed: () =>
-                          (audioHandler as AudioPlayerHandler).playNext(),
+                      onPressed: _handler.playNext,
                     ),
+                    _repeatButton(theme),
                   ],
                 );
               },
@@ -271,12 +261,54 @@ class _PlayerScreenState extends State<PlayerScreen> {
     );
   }
 
-  Widget _ghostButton({required IconData icon, required VoidCallback onPressed}) {
-    return IconButton(
-      iconSize: 42,
-      onPressed: onPressed,
-      icon: Icon(icon),
+  Widget _shuffleButton(ThemeData theme) {
+    return StreamBuilder<bool>(
+      stream: _handler.shuffleModeStream,
+      builder: (context, snap) {
+        final on = snap.data ?? false;
+        return IconButton(
+          iconSize: 24,
+          tooltip: 'Shuffle',
+          onPressed: _handler.toggleShuffle,
+          icon: Icon(
+            Icons.shuffle_rounded,
+            color: on
+                ? theme.colorScheme.primary
+                : theme.iconTheme.color?.withValues(alpha: 0.5),
+          ),
+        );
+      },
     );
+  }
+
+  Widget _repeatButton(ThemeData theme) {
+    return StreamBuilder<LoopMode>(
+      stream: _handler.loopModeStream,
+      builder: (context, snap) {
+        final mode = snap.data ?? LoopMode.all;
+        return IconButton(
+          iconSize: 24,
+          tooltip: switch (mode) {
+            LoopMode.off => 'Repeat off',
+            LoopMode.one => 'Repeat one',
+            LoopMode.all => 'Repeat all',
+          },
+          onPressed: _handler.cycleRepeatMode,
+          icon: Icon(
+            mode == LoopMode.one
+                ? Icons.repeat_one_rounded
+                : Icons.repeat_rounded,
+            color: mode == LoopMode.off
+                ? theme.iconTheme.color?.withValues(alpha: 0.5)
+                : theme.colorScheme.primary,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _ghostButton({required IconData icon, required VoidCallback onPressed}) {
+    return IconButton(iconSize: 40, onPressed: onPressed, icon: Icon(icon));
   }
 
   String _formatDuration(Duration duration) {
@@ -289,10 +321,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
 /// Album art with a soft glow, cross-fading between songs, gently scaling and
 /// glowing while playing.
 class _Artwork extends StatelessWidget {
-  const _Artwork({super.key, required this.size, required this.future});
+  const _Artwork({
+    super.key,
+    required this.size,
+    required this.future,
+    this.artUri,
+  });
 
   final double size;
   final Future<Uint8List?>? future;
+  final Uri? artUri;
 
   @override
   Widget build(BuildContext context) {
@@ -348,6 +386,18 @@ class _Artwork extends StatelessWidget {
   }
 
   Widget _image(ThemeData theme) {
+    // Remote artwork (e.g. Discover tracks).
+    final uri = artUri;
+    if (uri != null && (uri.isScheme('http') || uri.isScheme('https'))) {
+      return Image.network(
+        uri.toString(),
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        errorBuilder: (_, __, ___) => _placeholder(theme),
+      );
+    }
     if (future == null) return _placeholder(theme);
     return FutureBuilder<Uint8List?>(
       future: future,
@@ -386,8 +436,8 @@ class _PlayPauseButton extends StatelessWidget {
     return GestureDetector(
       onTap: onPressed,
       child: Container(
-        width: 78,
-        height: 78,
+        width: 76,
+        height: 76,
         decoration: BoxDecoration(
           color: color,
           shape: BoxShape.circle,

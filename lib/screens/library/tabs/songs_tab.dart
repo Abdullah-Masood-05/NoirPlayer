@@ -1,13 +1,10 @@
-import 'dart:convert';
-import 'dart:io';
-
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:noir_player/core/services/audio_handler.dart';
+import 'package:noir_player/core/services/playlist_service.dart';
 import 'package:on_audio_query/on_audio_query.dart' hide PlaylistModel;
 import 'package:permission_handler/permission_handler.dart';
 import '../../../core/models/playlist_model.dart';
-import 'package:path_provider/path_provider.dart';
 import '../../../widgets/now_playing_indicator.dart';
 
 class SongsTab extends StatefulWidget {
@@ -22,55 +19,12 @@ class SongsTab extends StatefulWidget {
 class _SongsTabState extends State<SongsTab> {
   final OnAudioQuery _audioQuery = OnAudioQuery();
   List<SongModel> _songs = [];
-  List<PlaylistModel> _playlists = [];
   String _searchText = '';
 
   @override
   void initState() {
     super.initState();
     _requestPermissionAndLoad();
-    _loadPlaylists();
-  }
-
-  Future<File> get _playlistFile async {
-    final dir = await getApplicationDocumentsDirectory();
-    return File('${dir.path}/playlists.json');
-  }
-
-  Future<void> _loadPlaylists() async {
-    try {
-      final file = await _playlistFile;
-      if (await file.exists()) {
-        final content = await file.readAsString();
-        final List<dynamic> jsonList = jsonDecode(content);
-        setState(() {
-          _playlists = jsonList.map((e) => PlaylistModel.fromJson(e)).toList();
-        });
-      } else {
-        final fav = PlaylistModel(
-          name: 'Favorites',
-          songs: [],
-          isFavourite: true,
-        );
-        setState(() {
-          _playlists = [fav];
-        });
-        await _savePlaylists();
-      }
-    } catch (e) {
-      debugPrint('❌ Error loading playlists: $e');
-    }
-  }
-
-  Future<void> _savePlaylists() async {
-    try {
-      final file = await _playlistFile;
-      await file.writeAsString(
-        jsonEncode(_playlists.map((p) => p.toJson()).toList()),
-      );
-    } catch (e) {
-      debugPrint('❌ Error saving playlists: $e');
-    }
   }
 
   Future<void> _requestPermissionAndLoad() async {
@@ -145,7 +99,7 @@ class _SongsTabState extends State<SongsTab> {
   }
 
   Future<void> _addSongToPlaylist(SongModel song) async {
-    if (_playlists.isEmpty) {
+    if (PlaylistService.instance.playlists.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('No playlists available.'),
@@ -234,9 +188,10 @@ class _SongsTabState extends State<SongsTab> {
                 constraints: const BoxConstraints(maxHeight: 300),
                 child: ListView.builder(
                   shrinkWrap: true,
-                  itemCount: _playlists.length,
+                  itemCount: PlaylistService.instance.playlists.length,
                   itemBuilder: (context, index) {
-                    final playlist = _playlists[index];
+                    final playlist =
+                        PlaylistService.instance.playlists[index];
                     final alreadyAdded =
                         playlist.songs.any((s) => s.id == song.id);
 
@@ -248,7 +203,8 @@ class _SongsTabState extends State<SongsTab> {
                             : () async {
                                 final navigator = Navigator.of(ctx);
                                 final messenger = ScaffoldMessenger.of(context);
-                                playlist.songs.add(
+                                await PlaylistService.instance.addSong(
+                                  playlist,
                                   PlaylistSong(
                                     id: song.id,
                                     title: song.title,
@@ -257,9 +213,7 @@ class _SongsTabState extends State<SongsTab> {
                                     duration: song.duration,
                                   ),
                                 );
-                                await _savePlaylists();
                                 if (!mounted) return;
-                                setState(() {});
                                 navigator.pop();
                                 messenger.showSnackBar(
                                   SnackBar(
@@ -633,6 +587,42 @@ class _SongsTabState extends State<SongsTab> {
                                         ),
                                       ),
                                       
+                                      // Favourite toggle
+                                      ListenableBuilder(
+                                        listenable: PlaylistService.instance,
+                                        builder: (context, _) {
+                                          final fav = PlaylistService.instance
+                                              .isFavourite(song.id);
+                                          return IconButton(
+                                            visualDensity: VisualDensity.compact,
+                                            tooltip: fav
+                                                ? 'Remove from Favourites'
+                                                : 'Add to Favourites',
+                                            icon: Icon(
+                                              fav
+                                                  ? Icons.favorite
+                                                  : Icons.favorite_border,
+                                              size: 22,
+                                              color: fav
+                                                  ? theme.colorScheme.primary
+                                                  : theme.iconTheme.color
+                                                        ?.withValues(alpha: 0.55),
+                                            ),
+                                            onPressed: () => PlaylistService
+                                                .instance
+                                                .toggleFavourite(
+                                                  PlaylistSong(
+                                                    id: song.id,
+                                                    title: song.title,
+                                                    artist: song.artist ??
+                                                        'Unknown Artist',
+                                                    data: song.data,
+                                                    duration: song.duration,
+                                                  ),
+                                                ),
+                                          );
+                                        },
+                                      ),
                                       // Now-playing indicator for the current
                                       // track, otherwise the duration chip.
                                       StreamBuilder<MediaItem?>(

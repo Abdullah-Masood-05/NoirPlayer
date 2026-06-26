@@ -61,19 +61,7 @@ class MiniPlayer extends StatelessWidget {
                         child: SizedBox(
                           width: 46,
                           height: 46,
-                          child: QueryArtworkWidget(
-                            id: songId ?? -1,
-                            type: ArtworkType.AUDIO,
-                            keepOldArtwork: true,
-                            artworkBorder: BorderRadius.circular(10),
-                            artworkWidth: 46,
-                            artworkHeight: 46,
-                            artworkFit: BoxFit.cover,
-                            nullArtworkWidget: Container(
-                              color: primary.withValues(alpha: 0.12),
-                              child: Icon(Icons.music_note, color: primary),
-                            ),
-                          ),
+                          child: _artwork(mediaItem, songId, primary),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -143,4 +131,34 @@ class MiniPlayer extends StatelessWidget {
       },
     );
   }
+
+  Widget _artwork(MediaItem mediaItem, int? songId, Color primary) {
+    final artUri = mediaItem.artUri;
+    if (artUri != null &&
+        (artUri.isScheme('http') || artUri.isScheme('https'))) {
+      return Image.network(
+        artUri.toString(),
+        width: 46,
+        height: 46,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        errorBuilder: (_, __, ___) => _placeholder(primary),
+      );
+    }
+    return QueryArtworkWidget(
+      id: songId ?? -1,
+      type: ArtworkType.AUDIO,
+      keepOldArtwork: true,
+      artworkBorder: BorderRadius.circular(10),
+      artworkWidth: 46,
+      artworkHeight: 46,
+      artworkFit: BoxFit.cover,
+      nullArtworkWidget: _placeholder(primary),
+    );
+  }
+
+  Widget _placeholder(Color primary) => Container(
+    color: primary.withValues(alpha: 0.12),
+    child: Icon(Icons.music_note, color: primary),
+  );
 }

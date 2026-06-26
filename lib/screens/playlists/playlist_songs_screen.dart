@@ -1,314 +1,161 @@
 import 'package:flutter/material.dart';
-import 'package:on_audio_query/on_audio_query.dart' as on_audio;
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:on_audio_query/on_audio_query.dart' hide PlaylistModel;
+
 import '../../core/models/playlist_model.dart';
 import '../../core/services/audio_handler.dart';
-import '../player/player_screen.dart';
+import '../../core/services/playlist_service.dart';
 
-class PlaylistSongsScreen extends StatefulWidget {
-  final PlaylistModel playlist;
-  final VoidCallback onNavigateToPlayer;
-  final VoidCallback onUpdatePlaylist;
-
+class PlaylistSongsScreen extends StatelessWidget {
   const PlaylistSongsScreen({
     super.key,
     required this.playlist,
     required this.onNavigateToPlayer,
-    required this.onUpdatePlaylist,
   });
 
-  @override
-  State<PlaylistSongsScreen> createState() => _PlaylistSongsScreenState();
-}
+  final PlaylistModel playlist;
+  final VoidCallback onNavigateToPlayer;
 
-class _PlaylistSongsScreenState extends State<PlaylistSongsScreen> {
-  void _playSong(int index) async {
-    if (!mounted) return;
-    Navigator.of(context).pop();
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => PlayerScreen()));
-
+  void _play(BuildContext context, int index) {
     final handler = audioHandler as AudioPlayerHandler;
-
-    // Set the playlist queue
-    handler.setQueue(widget.playlist.songs);
-
-    // Play the selected song
-    await handler.playSongAt(index);
+    handler.setQueue(playlist.songs);
+    handler.playSongAt(index);
+    Navigator.pop(context);
+    onNavigateToPlayer();
   }
 
-  Future<void> _confirmRemoveSong(int index) async {
-    final song = widget.playlist.songs[index];
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
+  Future<void> _confirmRemove(
+    BuildContext context,
+    PlaylistSong song,
+  ) async {
     final confirm = await showDialog<bool>(
       context: context,
-      barrierDismissible: true,
-      builder: (ctx) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        elevation: 8,
-        backgroundColor: theme.colorScheme.surface,
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Icon
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.delete_outline,
-                  color: Colors.red,
-                  size: 32,
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Title
-              Text(
-                'Remove Song',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: theme.textTheme.titleLarge?.color,
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // Content
-              Text(
-                'Are you sure you want to remove "${song.title}"?',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 15,
-                  color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.8),
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'This action cannot be undone.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.red.withValues(alpha: 0.7),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 28),
-
-              // Buttons
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(ctx, false),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        side: BorderSide(
-                          color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
-                          width: 1.5,
-                        ),
-                      ),
-                      child: Text(
-                        'Cancel',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: theme.textTheme.bodyLarge?.color,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.pop(ctx, true),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text(
-                        'Remove',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remove song'),
+        content: Text('Remove "${song.title}" from ${playlist.name}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
           ),
-        ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Remove'),
+          ),
+        ],
       ),
     );
-
     if (confirm == true) {
-      setState(() {
-        widget.playlist.songs.removeAt(index);
-      });
-      widget.onUpdatePlaylist();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Removed "${song.title}" from playlist'),
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-        );
-      }
+      await PlaylistService.instance.removeSong(playlist, song.id);
     }
   }
 
   String _formatDuration(int milliseconds) {
     final seconds = (milliseconds / 1000).round();
-    final minutes = seconds ~/ 60;
-    final remaining = (seconds % 60).toString().padLeft(2, '0');
-    return '$minutes:$remaining';
+    return '${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final songs = widget.playlist.songs;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.playlist.name),
-        backgroundColor: isDark ? Colors.grey[900] : Colors.white,
-        elevation: 1,
+        title: Text(playlist.name),
+        actions: [
+          if (playlist.isFavourite)
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: Icon(Icons.favorite, color: theme.colorScheme.primary),
+            ),
+        ],
       ),
-      body: songs.isEmpty
-          ? Center(
-              child: Text(
-                'No songs in this playlist',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: theme.textTheme.bodyMedium?.color,
-                ),
+      body: ListenableBuilder(
+        listenable: PlaylistService.instance,
+        builder: (context, _) {
+          final songs = playlist.songs;
+          if (songs.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    playlist.isFavourite
+                        ? Icons.favorite_border
+                        : Icons.queue_music,
+                    size: 64,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.25),
+                  ),
+                  const SizedBox(height: 16),
+                  Text('No songs yet', style: theme.textTheme.bodyMedium),
+                  const SizedBox(height: 4),
+                  Text(
+                    playlist.isFavourite
+                        ? 'Tap the heart on a song to add it here'
+                        : 'Long-press a song to add it to a playlist',
+                    style: theme.textTheme.bodySmall,
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(12),
-              itemCount: songs.length,
-              itemBuilder: (context, index) {
-                final song = songs[index];
+            );
+          }
 
-                return TweenAnimationBuilder<double>(
-                  duration: Duration(milliseconds: 300 + (index * 50)),
-                  tween: Tween(begin: 0.0, end: 1.0),
-                  curve: Curves.easeOutCubic,
-                  builder: (context, value, child) {
-                    return Transform.scale(
-                      scale: 0.9 + (0.1 * value),
-                      child: Opacity(opacity: value, child: child),
-                    );
-                  },
-                  child: Card(
-                    color: isDark ? Colors.black : Colors.white,
-                    margin: const EdgeInsets.symmetric(vertical: 6),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: ListTile(
-                      // contentPadding: const EdgeInsets.symmetric(
-                      //   horizontal: 16,
-                      //   vertical: 10,
-                      // ),
-                      leading: Hero(
-                        tag: 'song_art_${song.id}',
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: on_audio.QueryArtworkWidget(
-                            id: song.id,
-                            type: on_audio.ArtworkType.AUDIO,
-                            artworkBorder: BorderRadius.circular(12),
-                            nullArtworkWidget: Container(
-                              width: 50,
-                              height: 50,
-                              decoration: BoxDecoration(
-                                color: isDark
-                                    ? Colors.grey[800]
-                                    : Colors.grey[300],
-                                borderRadius: BorderRadius.circular(1),
-                              ),
-                              child: Icon(
-                                Icons.music_note,
-                                color: isDark ? Colors.white38 : Colors.black38,
-                              ),
-                            ),
-                          ),
+          return ListView.builder(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            itemCount: songs.length,
+            itemBuilder: (context, index) {
+              final song = songs[index];
+              return ListTile(
+                onTap: () => _play(context, index),
+                leading: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: SizedBox(
+                    width: 50,
+                    height: 50,
+                    child: QueryArtworkWidget(
+                      id: song.id,
+                      type: ArtworkType.AUDIO,
+                      artworkBorder: BorderRadius.circular(10),
+                      nullArtworkWidget: Container(
+                        color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                        child: Icon(
+                          Icons.music_note,
+                          color: theme.colorScheme.primary,
                         ),
                       ),
-                      title: Text(
-                        song.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: theme.textTheme.titleMedium?.color,
-                        ),
-                      ),
-                      subtitle: Text(
-                        song.artist,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 
-                            0.7,
-                          ),
-                        ),
-                      ),
-                      trailing: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isDark
-                              ? Colors.white.withValues(alpha: 0.05)
-                              : Colors.black.withValues(alpha: 0.03),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          _formatDuration(song.duration ?? 0),
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: theme.textTheme.bodySmall?.color
-                                ?.withValues(alpha: 0.8),
-                          ),
-                        ),
-                      ),
-                      onTap: () => _playSong(index),
-                      onLongPress: () => _confirmRemoveSong(index),
                     ),
                   ),
-                );
-              },
-            ),
+                ),
+                title: Text(
+                  song.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: Text(
+                  song.artist,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _formatDuration(song.duration ?? 0),
+                      style: theme.textTheme.bodySmall,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.remove_circle_outline),
+                      onPressed: () => _confirmRemove(context, song),
+                    ),
+                  ],
+                ),
+              ).animate().fadeIn(duration: 250.ms, delay: (index * 40).ms);
+            },
+          );
+        },
+      ),
     );
   }
 }

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'tabs/songs_tab.dart';
 import 'tabs/albums_tab.dart';
 import 'tabs/artists_tab.dart';
-import 'tabs/playlists_tab.dart';
 
 class LibraryScreen extends StatefulWidget {
   // ✅ Add callback parameter
@@ -21,7 +20,7 @@ class _LibraryScreenState extends State<LibraryScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -43,7 +42,6 @@ class _LibraryScreenState extends State<LibraryScreen>
             Tab(text: 'Songs'),
             Tab(text: 'Albums'),
             Tab(text: 'Artists'),
-            Tab(text: 'Playlists'),
           ],
         ),
       ),
@@ -54,7 +52,6 @@ class _LibraryScreenState extends State<LibraryScreen>
           SongsTab(onNavigateToPlayer: widget.onNavigateToPlayer),
           const AlbumsTab(),
           const ArtistsTab(),
-          PlaylistsTab(onNavigateToPlayer: widget.onNavigateToPlayer),
         ],
       ),
     );

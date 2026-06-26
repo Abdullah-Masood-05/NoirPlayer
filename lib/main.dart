@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:noir_player/core/services/audio_handler.dart';
+import 'package:noir_player/core/services/playlist_service.dart';
 import 'package:noir_player/core/services/settings_service.dart';
 import 'package:noir_player/screens/player/player_screen.dart';
 import 'core/theme/app_theme.dart';
@@ -16,8 +17,9 @@ void main() async {
     await dotenv.load();
   } catch (_) {}
 
-  // Load persisted user settings before anything reads them.
+  // Load persisted user settings + playlists before anything reads them.
   await SettingsService.instance.load();
+  await PlaylistService.instance.load();
 
   // Don't let an audio-service init failure block the UI from starting.
   // Screens guard usage with isAudioServiceInitialized().

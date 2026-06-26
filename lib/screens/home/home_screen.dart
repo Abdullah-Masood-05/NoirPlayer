@@ -5,6 +5,7 @@ import '../playlists/playlists_screen.dart';
 import '../discover/discover_screen.dart';
 import '../settings/settings_screen.dart';
 import '../about/about_screen.dart';
+import '../../core/services/settings_service.dart';
 import '../../core/services/sleep_timer_service.dart';
 import '../../widgets/playback_menus.dart';
 import '../../widgets/mini_player.dart';
@@ -53,7 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case 2:
         return PlaylistsScreen(onNavigateToPlayer: _navigateToPlayer);
       case 3:
-        return const DiscoverScreen();
+        return DiscoverScreen(onNavigateToPlayer: _navigateToPlayer);
       default:
         return const SizedBox.shrink();
     }
@@ -61,8 +62,39 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // On the Player tab the bar floats over the player's gradient for a single,
+    // cohesive top area; the speed/sleep actions live here too.
+    final isPlayer = _selectedIndex == 1;
     return Scaffold(
-      appBar: AppBar(title: Text(_titles[_selectedIndex]), centerTitle: true),
+      extendBodyBehindAppBar: isPlayer,
+      appBar: AppBar(
+        title: Text(_titles[_selectedIndex]),
+        centerTitle: true,
+        backgroundColor: isPlayer ? Colors.transparent : null,
+        scrolledUnderElevation: isPlayer ? 0 : null,
+        actions: isPlayer
+            ? [
+                ListenableBuilder(
+                  listenable: SettingsService.instance,
+                  builder: (context, _) => TextButton(
+                    onPressed: () => showPlaybackSpeedSheet(context),
+                    child: Text(
+                      formatSpeed(SettingsService.instance.playbackSpeed),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Sleep timer',
+                  icon: const Icon(Icons.bedtime_outlined),
+                  onPressed: () => showSleepTimerSheet(context),
+                ),
+              ]
+            : null,
+      ),
       drawer: _buildDrawer(context),
       body: Column(
         children: [
