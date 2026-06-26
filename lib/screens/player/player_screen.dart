@@ -49,21 +49,35 @@ class _PlayerScreenState extends State<PlayerScreen> {
         final mediaItem = snapshot.data;
 
         if (mediaItem == null) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.music_note,
-                  size: 72,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.25),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'No song is currently playing',
-                  style: theme.textTheme.bodyMedium,
-                ),
-              ],
+          return Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  primary.withValues(alpha: 0.28),
+                  theme.scaffoldBackgroundColor,
+                  theme.scaffoldBackgroundColor,
+                ],
+                stops: const [0.0, 0.55, 1.0],
+              ),
+            ),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.music_note,
+                    size: 72,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.25),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No song is currently playing',
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                ],
+              ),
             ),
           );
         }

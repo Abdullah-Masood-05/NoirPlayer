@@ -5,6 +5,7 @@ import 'package:on_audio_query/on_audio_query.dart' hide PlaylistModel;
 import '../../core/models/playlist_model.dart';
 import '../../core/services/audio_handler.dart';
 import '../../core/services/playlist_service.dart';
+import '../../core/theme/app_theme.dart';
 
 class PlaylistSongsScreen extends StatelessWidget {
   const PlaylistSongsScreen({
@@ -61,7 +62,9 @@ class PlaylistSongsScreen extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
         title: Text(playlist.name),
         actions: [
           if (playlist.isFavourite)
@@ -71,9 +74,11 @@ class PlaylistSongsScreen extends StatelessWidget {
             ),
         ],
       ),
-      body: ListenableBuilder(
-        listenable: PlaylistService.instance,
-        builder: (context, _) {
+      body: Container(
+        decoration: AppTheme.topFade(context),
+        child: ListenableBuilder(
+          listenable: PlaylistService.instance,
+          builder: (context, _) {
           final songs = playlist.songs;
           if (songs.isEmpty) {
             return Center(
@@ -103,7 +108,10 @@ class PlaylistSongsScreen extends StatelessWidget {
           }
 
           return ListView.builder(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: EdgeInsets.only(
+              top: MediaQuery.paddingOf(context).top + kToolbarHeight + 8,
+              bottom: 8,
+            ),
             itemCount: songs.length,
             itemBuilder: (context, index) {
               final song = songs[index];
@@ -155,6 +163,7 @@ class PlaylistSongsScreen extends StatelessWidget {
             },
           );
         },
+        ),
       ),
     );
   }

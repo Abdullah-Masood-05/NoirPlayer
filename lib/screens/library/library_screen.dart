@@ -38,8 +38,9 @@ class _LibraryScreenState extends State<LibraryScreen>
         bottom: false,
         child: Column(
           children: [
-            // Clear the transparent app bar drawn by the home shell.
-            const SizedBox(height: kToolbarHeight),
+            // Clear the transparent app bar drawn by the home shell (kept tight
+            // so the tabs sit just under the "Library" title).
+            const SizedBox(height: kToolbarHeight - 14),
             TabBar(
               controller: _tabController,
               labelColor: theme.colorScheme.primary,
