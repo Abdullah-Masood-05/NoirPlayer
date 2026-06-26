@@ -21,12 +21,17 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   String? _currentlyPlayingTrack; // "trackName-artistName"
   bool _isPlaying = false;
   String? _loadingTrack; // Track being loaded
-  Map<String, double> _downloadProgress =
+  final Map<String, double> _downloadProgress =
       {}; // "trackName-artistName" -> progress
 
   @override
   void initState() {
     super.initState();
+    // Load which tracks were already downloaded so we can show their state
+    // and prevent downloading the same song twice.
+    _discoveryService.loadDownloadedKeys().then((_) {
+      if (mounted) setState(() {});
+    });
     _loadTrending();
   }
 
@@ -42,18 +47,16 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     setState(() => _isLoading = true);
     try {
       final tracks = await _discoveryService.fetchTrendingTracks();
+      if (!mounted) return;
       setState(() {
         _tracks = tracks;
         _isLoading = false;
         _isSearching = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error loading trending: $e')));
-      }
+      _showSnack('Error loading trending: $e');
     }
   }
 
@@ -70,17 +73,15 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
     try {
       final tracks = await _discoveryService.searchTracks(query);
+      if (!mounted) return;
       setState(() {
         _tracks = tracks;
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error searching: $e')));
-      }
+      _showSnack('Error searching: $e');
     }
   }
 
@@ -121,6 +122,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       }
 
       await _player.setUrl(mp3Url);
+      if (!mounted) return;
       setState(() {
         _loadingTrack = null;
         _isPlaying = true;
@@ -128,76 +130,66 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       });
       await _player.play();
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _loadingTrack = null;
         _currentlyPlayingTrack = null;
         _isPlaying = false;
       });
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error playing track: $e')));
-      }
+      _showSnack('Error playing track: $e');
     }
   }
 
   Future<void> _downloadTrack(DiscoveredTrack track) async {
-    final trackKey = '${track.name}-${track.artist}';
+    final trackKey = _discoveryService.trackKey(track);
 
-    try {
-      // Initialize progress
-      setState(() {
-        _downloadProgress[trackKey] = 0.0;
-      });
-
-      // Get video ID
-      final videoId = await _discoveryService.fetchYoutubeVideoId(
-        track.name,
-        track.artist,
-      );
-
-      if (videoId.isEmpty) {
-        throw Exception('No video found');
-      }
-
-      // Get download URL
-      final mp3Url = await _discoveryService.getDownloadUrl(videoId);
-
-      if (mp3Url == null || mp3Url.isEmpty) {
-        throw Exception('No download URL found');
-      }
-
-      // Download file
-      final savedUri = await _discoveryService.saveFile(
-        mp3Url,
-        track.name,
-        onProgress: (received, total) {
-          if (total != -1) {
-            setState(() {
-              _downloadProgress[trackKey] = received / total;
-            });
-          }
-        },
-      );
-
-      // Remove progress indicator
-      setState(() {
-        _downloadProgress.remove(trackKey);
-      });
-
-      if (savedUri != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${track.name} downloaded successfully'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } catch (e) {
-      setState(() {
-        _downloadProgress.remove(trackKey);
-      });
+    // Don't download something that's already saved or in progress.
+    if (_discoveryService.isDownloaded(trackKey)) {
+      _showSnack('${track.name} is already downloaded');
+      return;
     }
+    if (_downloadProgress.containsKey(trackKey)) return;
+
+    setState(() => _downloadProgress[trackKey] = 0.0);
+
+    final result = await _discoveryService.downloadTrack(
+      track,
+      onProgress: (received, total) {
+        if (total > 0 && mounted) {
+          setState(() => _downloadProgress[trackKey] = received / total);
+        }
+      },
+    );
+
+    if (!mounted) return;
+    setState(() => _downloadProgress.remove(trackKey));
+
+    switch (result) {
+      case DownloadResult.success:
+        _showSnack('${track.name} downloaded successfully');
+        break;
+      case DownloadResult.alreadyExists:
+        _showSnack('${track.name} is already downloaded');
+        break;
+      case DownloadResult.noSource:
+        _showSnack('No downloadable source found for ${track.name}');
+        break;
+      case DownloadResult.failed:
+        _showSnack('Failed to download ${track.name}');
+        break;
+      case DownloadResult.inProgress:
+        break; // already downloading; no message needed
+    }
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override
@@ -266,6 +258,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                 final isCurrentTrack = _currentlyPlayingTrack == trackKey;
                 final isLoading = _loadingTrack == trackKey;
                 final downloadProgress = _downloadProgress[trackKey];
+                final isDownloaded = _discoveryService.isDownloaded(trackKey);
 
                 return Card(
                   margin: const EdgeInsets.symmetric(
@@ -354,11 +347,26 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                           child: downloadProgress != null
                               ? Center(
                                   child: CircularProgressIndicator(
-                                    value: downloadProgress,
+                                    // Indeterminate until the first bytes arrive.
+                                    value: downloadProgress > 0
+                                        ? downloadProgress
+                                        : null,
                                     strokeWidth: 4,
                                   ),
                                 )
+                              : isDownloaded
+                              ? IconButton(
+                                  tooltip: 'Already downloaded',
+                                  icon: const Icon(
+                                    Icons.download_done,
+                                    color: Colors.green,
+                                  ),
+                                  onPressed: () => _showSnack(
+                                    '${track.name} is already downloaded',
+                                  ),
+                                )
                               : IconButton(
+                                  tooltip: 'Download',
                                   icon: const Icon(Icons.download),
                                   onPressed: () => _downloadTrack(track),
                                 ),
