@@ -1,3 +1,6 @@
+# Environment / secrets — keep real API keys out of version control
+.env
+
 # Miscellaneous
 *.class
 *.log

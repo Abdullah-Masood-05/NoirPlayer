@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:noir_player/core/services/audio_handler.dart';
 import 'package:noir_player/screens/player/player_screen.dart';
 import 'core/theme/app_theme.dart';
@@ -7,6 +8,11 @@ import 'screens/home/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Load API keys for the Discover/download module. fileName defaults to ".env";
+  // ignore errors so the app still runs if the file is missing.
+  try {
+    await dotenv.load();
+  } catch (_) {}
   await initAudioService();
   timeDilation = 1.0;
   runApp(NoirPlayerApp());
