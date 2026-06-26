@@ -79,7 +79,8 @@ Grab the latest signed APK from the **[Releases](https://github.com/Abdullah-Mas
 
 | Version | Notes |
 |---|---|
-| **v1.1.0** | Music‑folder tab, repeat/shuffle, Discover plays in the main player, playlist/favourites fixes, immersive UI + animations |
+| **v1.1.1** | Native equalizer (bands + presets) |
+| v1.1.0 | Music‑folder tab, repeat/shuffle, Discover plays in the main player, playlist/favourites fixes, immersive UI + animations |
 | v1.0.0 | Online discovery, downloads, media controls and full playback settings |
 | v0.2.0 | Firebase authentication (experimental, pre‑release) |
 | v0.1.0 | Initial local music player |

@@ -13,6 +13,9 @@ class ArtistsTab extends StatefulWidget {
 class _ArtistsTabState extends State<ArtistsTab> {
   final OnAudioQuery _audioQuery = OnAudioQuery();
   bool _permissionGranted = false;
+  // Cache queries so tab switches don't re-run them (which caused lag).
+  Future<List<ArtistModel>>? _artistsFuture;
+  final Map<int, Future<SongModel?>> _firstSongFutures = {};
 
   @override
   void initState() {
@@ -71,7 +74,7 @@ class _ArtistsTabState extends State<ArtistsTab> {
     }
 
     return FutureBuilder<List<ArtistModel>>(
-      future: _audioQuery.queryArtists(),
+      future: _artistsFuture ??= _audioQuery.queryArtists(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -119,7 +122,8 @@ class _ArtistsTabState extends State<ArtistsTab> {
                 );
               },
               child: FutureBuilder<SongModel?>(
-                future: _getFirstSongOfArtist(artist.id),
+                future: _firstSongFutures[artist.id] ??=
+                    _getFirstSongOfArtist(artist.id),
                 builder: (context, songSnapshot) {
                   final song = songSnapshot.data;
 

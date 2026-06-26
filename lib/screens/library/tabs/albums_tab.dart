@@ -13,6 +13,8 @@ class AlbumsTab extends StatefulWidget {
 class _AlbumsTabState extends State<AlbumsTab> {
   final OnAudioQuery _audioQuery = OnAudioQuery();
   bool _permissionGranted = false;
+  // Query once and reuse, so tab switches don't re-run it (which caused lag).
+  Future<List<AlbumModel>>? _albumsFuture;
 
   @override
   void initState() {
@@ -40,7 +42,7 @@ class _AlbumsTabState extends State<AlbumsTab> {
     }
 
     return FutureBuilder<List<AlbumModel>>(
-      future: _audioQuery.queryAlbums(),
+      future: _albumsFuture ??= _audioQuery.queryAlbums(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
