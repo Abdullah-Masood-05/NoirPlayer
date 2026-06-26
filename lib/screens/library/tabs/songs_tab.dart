@@ -1,12 +1,14 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:noir_player/core/services/audio_handler.dart';
 import 'package:on_audio_query/on_audio_query.dart' hide PlaylistModel;
 import 'package:permission_handler/permission_handler.dart';
 import '../../../core/models/playlist_model.dart';
 import 'package:path_provider/path_provider.dart';
+import '../../../widgets/now_playing_indicator.dart';
 
 class SongsTab extends StatefulWidget {
   final VoidCallback onNavigateToPlayer;
@@ -631,28 +633,58 @@ class _SongsTabState extends State<SongsTab> {
                                         ),
                                       ),
                                       
-                                      // Duration
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 6,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: isDark
-                                              ? Colors.white.withValues(alpha: 0.05)
-                                              : Colors.black.withValues(alpha: 0.03),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Text(
-                                          _formatDuration(song.duration ?? 0),
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w500,
-                                            color: theme
-                                                .textTheme.bodySmall?.color
-                                                ?.withValues(alpha: 0.8),
-                                          ),
-                                        ),
+                                      // Now-playing indicator for the current
+                                      // track, otherwise the duration chip.
+                                      StreamBuilder<MediaItem?>(
+                                        stream: audioHandler.mediaItem,
+                                        builder: (context, snap) {
+                                          final isCurrent =
+                                              snap.data?.id ==
+                                              song.id.toString();
+                                          if (isCurrent) {
+                                            return Padding(
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 8,
+                                              ),
+                                              child: NowPlayingIndicator(
+                                                color: theme.colorScheme.primary,
+                                                size: 18,
+                                              ),
+                                            );
+                                          }
+                                          return Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 6,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: isDark
+                                                  ? Colors.white.withValues(
+                                                      alpha: 0.05,
+                                                    )
+                                                  : Colors.black.withValues(
+                                                      alpha: 0.03,
+                                                    ),
+                                              borderRadius: BorderRadius.circular(
+                                                8,
+                                              ),
+                                            ),
+                                            child: Text(
+                                              _formatDuration(
+                                                song.duration ?? 0,
+                                              ),
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w500,
+                                                color: theme
+                                                    .textTheme
+                                                    .bodySmall
+                                                    ?.color
+                                                    ?.withValues(alpha: 0.8),
+                                              ),
+                                            ),
+                                          );
+                                        },
                                       ),
                                     ],
                                   ),

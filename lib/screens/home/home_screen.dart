@@ -7,6 +7,7 @@ import '../settings/settings_screen.dart';
 import '../about/about_screen.dart';
 import '../../core/services/sleep_timer_service.dart';
 import '../../widgets/playback_menus.dart';
+import '../../widgets/mini_player.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -63,29 +64,54 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(_titles[_selectedIndex]), centerTitle: true),
       drawer: _buildDrawer(context),
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: List.generate(
-          _titles.length,
-          (i) =>
-              _visited.contains(i) ? _buildScreen(i) : const SizedBox.shrink(),
-        ),
+      body: Column(
+        children: [
+          Expanded(
+            child: IndexedStack(
+              index: _selectedIndex,
+              children: List.generate(
+                _titles.length,
+                (i) => _visited.contains(i)
+                    ? _buildScreen(i)
+                    : const SizedBox.shrink(),
+              ),
+            ),
+          ),
+          // Mini-player above the nav bar (hidden on the Player tab and when
+          // nothing is loaded).
+          AnimatedSize(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
+            child: _selectedIndex == 1
+                ? const SizedBox.shrink()
+                : MiniPlayer(onTap: () => _onItemTapped(1)),
+          ),
+        ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.library_music),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _selectedIndex,
+        onDestinationSelected: _onItemTapped,
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.library_music_outlined),
+            selectedIcon: Icon(Icons.library_music),
             label: 'Library',
           ),
-          BottomNavigationBarItem(icon: Icon(Icons.music_note), label: 'Player'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.playlist_play),
+          NavigationDestination(
+            icon: Icon(Icons.music_note_outlined),
+            selectedIcon: Icon(Icons.music_note),
+            label: 'Player',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.playlist_play_outlined),
+            selectedIcon: Icon(Icons.playlist_play),
             label: 'Playlists',
           ),
-          BottomNavigationBarItem(icon: Icon(Icons.explore), label: 'Discover'),
+          NavigationDestination(
+            icon: Icon(Icons.explore_outlined),
+            selectedIcon: Icon(Icons.explore),
+            label: 'Discover',
+          ),
         ],
       ),
     );
@@ -98,7 +124,16 @@ class _HomeScreenState extends State<HomeScreen> {
         padding: EdgeInsets.zero,
         children: [
           DrawerHeader(
-            decoration: BoxDecoration(color: theme.colorScheme.primary),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  theme.colorScheme.primary,
+                  theme.colorScheme.primary.withValues(alpha: 0.65),
+                ],
+              ),
+            ),
             child: const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.end,
