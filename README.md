@@ -7,12 +7,16 @@
 **A sleek, lightweight Flutter music player** — play your local library, discover trending tracks, and download songs straight to your device.
 
 <p>
+  <a href="https://github.com/Abdullah-Masood-05/NoirPlayer/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/Abdullah-Masood-05/NoirPlayer?label=release&color=blue"></a>
+  <a href="https://github.com/Abdullah-Masood-05/NoirPlayer/releases/latest"><img alt="Downloads" src="https://img.shields.io/github/downloads/Abdullah-Masood-05/NoirPlayer/total?color=brightgreen"></a>
   <a href="https://flutter.dev"><img alt="Flutter" src="https://img.shields.io/badge/Flutter-3.9+-02569B?logo=flutter&logoColor=white"></a>
   <a href="https://dart.dev"><img alt="Dart" src="https://img.shields.io/badge/Dart-3.9+-0175C2?logo=dart&logoColor=white"></a>
   <img alt="Platform" src="https://img.shields.io/badge/Platform-Android-3DDC84?logo=android&logoColor=white">
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/License-MIT-yellow.svg"></a>
-  <img alt="Status" src="https://img.shields.io/badge/Status-Active-success">
-  <img alt="PRs Welcome" src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg">
+</p>
+
+<p>
+  <a href="https://github.com/Abdullah-Masood-05/NoirPlayer/releases/latest"><b>📥 Download the latest APK</b></a>
 </p>
 
 </div>
@@ -23,6 +27,7 @@
 
 - [📦 Overview](#-overview)
 - [✨ Features](#-features)
+- [📥 Download](#-download)
 - [🖼️ Screens](#️-screens)
 - [📁 Project Structure](#-project-structure)
 - [🚀 Getting Started](#-getting-started)
@@ -44,9 +49,10 @@ Noir Player is a small, focused Flutter app that:
 
 1. **Loads your local audio files** from the device library.
 2. **Shows them in a tabbed library** (`Songs`, `Albums`, `Artists`, `Playlists`).
-3. **Runs a background audio service**, so playback keeps going when the app is backgrounded or the screen is locked.
+3. **Runs a background audio service**, so playback keeps going when the app is backgrounded or the screen is locked — with media controls on the notification, lock screen and dynamic island.
 4. **Discovers new music** — browse trending tracks and search by name via the **Last.fm** API.
 5. **Streams & downloads** — preview tracks and save them as MP3 to your device's music folder.
+6. **Tailors playback** — sleep timer, playback speed, resume‑after‑a‑call and more, all in a sectioned Settings page reached from the side drawer.
 
 ---
 
@@ -56,24 +62,42 @@ Noir Player is a small, focused Flutter app that:
 |---|---|---|
 | 🎼 **Tabbed Library** | `library_screen.dart` | Songs / Albums / Artists / Playlists via `on_audio_query` |
 | ▶️ **Now Playing** | `player_screen.dart` | Reactive UI bound to `audioHandler.mediaItem` & `playbackState` |
-| 🔊 **Background Playback** | `audio_handler.dart` | `audio_service` + `just_audio` keep music playing in the background |
+| 🔊 **Background Playback** | `audio_handler.dart` | `audio_service` + `just_audio` with notification / lock‑screen / dynamic‑island controls and artwork |
 | 🧭 **Discover** | `discover_screen.dart` | Trending + search powered by Last.fm, with album art |
-| ⬇️ **Download** | `music_discovery_service.dart` | Resolves YouTube → MP3 (RapidAPI) and saves via `media_store_plus` |
-| 🎨 **Theming** | `settings_screen.dart` | Light / Dark / System theme, switchable at runtime |
+| ⬇️ **Download** | `music_discovery_service.dart` | Resolves YouTube → MP3 (RapidAPI) and saves via `media_store_plus`, with duplicate‑download protection |
+| ⏱️ **Sleep Timer** | `sleep_timer_service.dart` | Auto‑pause after a chosen duration, with a live countdown |
+| ⏩ **Playback Speed** | `audio_handler.dart` | 0.5×–2× without pitch change, persisted |
+| 📞 **Call / interruption handling** | `audio_handler.dart` | Resume after a call via `audio_session` |
+| ⚙️ **Persistent Settings** | `settings_service.dart` | Theme, playback and notification options saved with `shared_preferences` |
+
+---
+
+## 📥 Download
+
+Grab the latest signed APK from the **[Releases](https://github.com/Abdullah-Masood-05/NoirPlayer/releases/latest)** page
+(`NoirPlayer-vX.Y.Z.apk`) and install it on Android 6.0+. You may need to allow installing from unknown sources.
+
+| Version | Notes |
+|---|---|
+| **v1.0.0** | Online discovery, downloads, media controls and full playback settings |
+| v0.2.0 | Firebase authentication (experimental, pre‑release) |
+| v0.1.0 | Initial local music player |
 
 ---
 
 ## 🖼️ Screens
 
-The app uses a **bottom navigation bar** with five destinations:
+A **4‑tab bottom bar** plus a **hamburger drawer** for everything else:
 
-| Tab | Description |
-|---|---|
-| 📚 **Library** | Your local songs, albums, artists |
-| 🎵 **Player** | The full "Now Playing" view |
-| 🎶 **Playlists** | Create and browse playlists |
-| 🧭 **Discover** | Trending tracks, search, stream & download |
-| ⚙️ **Settings** | Theme selection and app preferences |
+| Destination | Where | Description |
+|---|---|---|
+| 📚 **Library** | bottom bar | Your local songs, albums, artists |
+| 🎵 **Player** | bottom bar | The full "Now Playing" view (with speed & sleep‑timer actions) |
+| 🎶 **Playlists** | bottom bar | Create and browse playlists |
+| 🧭 **Discover** | bottom bar | Trending tracks, search, stream & download |
+| ⚙️ **Settings** | drawer | Appearance, playback, notification & timer options |
+| ⏱️ **Sleep Timer** | drawer | Start / cancel the auto‑stop timer |
+| ℹ️ **About** | drawer | App info |
 
 ---
 
@@ -81,25 +105,29 @@ The app uses a **bottom navigation bar** with five destinations:
 
 ```
 lib/
-├── main.dart                      # App entry — loads .env, inits audio service
+├── main.dart                      # App entry — loads .env + settings, inits audio service
 ├── core/
 │   ├── models/
 │   │   ├── playlist_model.dart
-│   │   └── discovered_track.dart  # Discover/download track model
+│   │   └── discovered_track.dart        # Discover/download track model
 │   ├── services/
-│   │   ├── audio_handler.dart     # Background audio (audio_service + just_audio)
-│   │   └── music_discovery_service.dart  # Last.fm + YouTube + MP3 download
+│   │   ├── audio_handler.dart           # Background audio, media controls, interruptions
+│   │   ├── music_discovery_service.dart # Last.fm + YouTube + MP3 download
+│   │   ├── settings_service.dart        # Persisted user preferences
+│   │   └── sleep_timer_service.dart     # Auto‑stop timer
 │   └── theme/
 │       └── app_theme.dart
 ├── screens/
-│   ├── home/home_screen.dart      # Bottom nav shell
+│   ├── home/home_screen.dart      # Bottom nav + hamburger drawer shell
 │   ├── library/                   # Library + tabs (songs/albums/artists/playlists)
 │   ├── player/player_screen.dart
 │   ├── playlists/
 │   ├── albums/  artist/
-│   ├── discover/discover_screen.dart   # 🆕 Discover + download UI
-│   └── settings/settings_screen.dart
+│   ├── discover/discover_screen.dart    # Discover + download UI
+│   ├── settings/settings_screen.dart    # Sectioned settings
+│   └── about/about_screen.dart
 └── widgets/
+    └── playback_menus.dart        # Sleep‑timer & playback‑speed bottom sheets
 ```
 
 ---
@@ -208,8 +236,9 @@ folder via `media_store_plus`.
 
 | Package | Purpose |
 |---|---|
-| [`just_audio`](https://pub.dev/packages/just_audio) | Audio playback |
-| [`audio_service`](https://pub.dev/packages/audio_service) | Background playback + notifications |
+| [`just_audio`](https://pub.dev/packages/just_audio) | Audio playback (queue, speed, seeking) |
+| [`audio_service`](https://pub.dev/packages/audio_service) | Background playback + notification / lock‑screen controls |
+| [`audio_session`](https://pub.dev/packages/audio_session) | Audio focus & call/headset interruptions |
 | [`on_audio_query`](https://pub.dev/packages/on_audio_query) | Read the device's music library & artwork |
 | [`permission_handler`](https://pub.dev/packages/permission_handler) | Runtime permissions |
 | [`provider`](https://pub.dev/packages/provider) · [`shared_preferences`](https://pub.dev/packages/shared_preferences) | State & persistence |
