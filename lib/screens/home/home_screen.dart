@@ -62,16 +62,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // On the Player tab the bar floats over the player's gradient for a single,
-    // cohesive top area; the speed/sleep actions live here too.
+    // Every tab floats its content up behind a transparent app bar over a
+    // subtle gradient (the player's immersive look), for one cohesive top area.
     final isPlayer = _selectedIndex == 1;
     return Scaffold(
-      extendBodyBehindAppBar: isPlayer,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: Text(_titles[_selectedIndex]),
         centerTitle: true,
-        backgroundColor: isPlayer ? Colors.transparent : null,
-        scrolledUnderElevation: isPlayer ? 0 : null,
+        backgroundColor: Colors.transparent,
+        scrolledUnderElevation: 0,
         actions: isPlayer
             ? [
                 ListenableBuilder(

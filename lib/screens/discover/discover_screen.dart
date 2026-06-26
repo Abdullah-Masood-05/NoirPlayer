@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/models/discovered_track.dart';
 import '../../core/services/audio_handler.dart';
 import '../../core/services/music_discovery_service.dart';
+import '../../core/theme/app_theme.dart';
 import '../../widgets/now_playing_indicator.dart';
 
 class DiscoverScreen extends StatefulWidget {
@@ -168,11 +169,19 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      body: Column(
-        children: [
-          _searchBar(theme),
-          Expanded(child: _content(theme)),
-        ],
+      backgroundColor: Colors.transparent,
+      body: Container(
+        decoration: AppTheme.topFade(context),
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              const SizedBox(height: kToolbarHeight),
+              _searchBar(theme),
+              Expanded(child: _content(theme)),
+            ],
+          ),
+        ),
       ),
     );
   }

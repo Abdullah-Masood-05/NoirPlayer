@@ -7,6 +7,23 @@ class AppTheme {
   static const Color darkSurface = Color(0xFF1E1E1E);
   static const Color lightBackground = Color(0xFFFAFAFA);
 
+  /// Subtle red wash fading into the background, used at the top of every screen
+  /// so they share the player's immersive look behind the transparent app bar.
+  static BoxDecoration topFade(BuildContext context) {
+    final theme = Theme.of(context);
+    return BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          theme.colorScheme.primary.withValues(alpha: 0.18),
+          theme.scaffoldBackgroundColor,
+        ],
+        stops: const [0.0, 0.28],
+      ),
+    );
+  }
+
   static final ThemeData darkTheme = _build(
     brightness: Brightness.dark,
     scaffold: darkBackground,

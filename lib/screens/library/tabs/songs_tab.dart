@@ -354,21 +354,9 @@ class _SongsTabState extends State<SongsTab> {
           (song.artist ?? '').toLowerCase().contains(lowerSearch);
     }).toList();
 
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            theme.colorScheme.primary.withValues(alpha: 0.10),
-            theme.scaffoldBackgroundColor,
-          ],
-          stops: const [0.0, 0.3],
-        ),
-      ),
-      child: Column(
-        children: [
-          // Search bar
+    return Column(
+      children: [
+        // Search bar
         Padding(
           padding: const EdgeInsets.all(12.0),
           child: Container(
@@ -697,7 +685,6 @@ class _SongsTabState extends State<SongsTab> {
                     ),
         ),
       ],
-      ),
     );
   }
 

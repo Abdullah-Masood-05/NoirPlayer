@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../core/models/playlist_model.dart';
 import '../../core/services/playlist_service.dart';
+import '../../core/theme/app_theme.dart';
 import 'playlist_songs_screen.dart';
 
 class PlaylistsScreen extends StatelessWidget {
@@ -19,14 +20,22 @@ class PlaylistsScreen extends StatelessWidget {
       builder: (context, _) {
         final playlists = service.playlists;
         return Scaffold(
+          backgroundColor: Colors.transparent,
           floatingActionButton: FloatingActionButton.extended(
             onPressed: () => _createPlaylist(context, service),
             icon: const Icon(Icons.add),
             label: const Text('New playlist'),
           ),
-          body: GridView.builder(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          body: Container(
+            decoration: AppTheme.topFade(context),
+            child: GridView.builder(
+              padding: EdgeInsets.fromLTRB(
+                12,
+                MediaQuery.paddingOf(context).top + kToolbarHeight + 8,
+                12,
+                88,
+              ),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
               mainAxisSpacing: 14,
               crossAxisSpacing: 14,
@@ -46,6 +55,7 @@ class PlaylistsScreen extends StatelessWidget {
                     curve: Curves.easeOut,
                   );
             },
+            ),
           ),
         );
       },
