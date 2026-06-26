@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'dart:typed_data';
 import '../../core/services/audio_handler.dart';
+import '../../core/services/settings_service.dart';
+import '../../widgets/playback_menus.dart';
 
 class PlayerScreen extends StatefulWidget {
   const PlayerScreen({super.key});
@@ -41,8 +43,28 @@ class _PlayerScreenState extends State<PlayerScreen> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor:
-            theme.appBarTheme.backgroundColor,
+        backgroundColor: theme.appBarTheme.backgroundColor,
+        actions: [
+          // Playback speed (shows the current value).
+          ListenableBuilder(
+            listenable: SettingsService.instance,
+            builder: (context, _) => TextButton(
+              onPressed: () => showPlaybackSpeedSheet(context),
+              child: Text(
+                formatSpeed(SettingsService.instance.playbackSpeed),
+                style: TextStyle(
+                  color: theme.appBarTheme.foregroundColor ?? theme.iconTheme.color,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Sleep timer',
+            icon: const Icon(Icons.bedtime_outlined),
+            onPressed: () => showSleepTimerSheet(context),
+          ),
+        ],
       ),
       body: StreamBuilder<MediaItem?>(
         stream: audioHandler.mediaItem,

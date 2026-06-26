@@ -1,15 +1,15 @@
-
 import 'package:flutter/material.dart';
 import '../library/library_screen.dart';
 import '../player/player_screen.dart';
 import '../playlists/playlists_screen.dart';
 import '../discover/discover_screen.dart';
 import '../settings/settings_screen.dart';
+import '../about/about_screen.dart';
+import '../../core/services/sleep_timer_service.dart';
+import '../../widgets/playback_menus.dart';
 
 class HomeScreen extends StatefulWidget {
-  final ValueNotifier<ThemeMode> themeNotifier;
-
-  const HomeScreen({super.key, required this.themeNotifier});
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -18,9 +18,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
 
-  // Tabs opened at least once. Lets the IndexedStack build screens lazily (so
-  // e.g. Discover doesn't hit the network until first opened) while keeping
-  // each one alive — and its state — once built.
+  // Tabs opened at least once, so the IndexedStack builds them lazily and keeps
+  // their state once built.
   final Set<int> _visited = {0};
 
   final List<String> _titles = const [
@@ -28,7 +27,6 @@ class _HomeScreenState extends State<HomeScreen> {
     'Now Playing',
     'Playlists',
     'Discover',
-    'Settings',
   ];
 
   void _onItemTapped(int index) {
@@ -55,8 +53,6 @@ class _HomeScreenState extends State<HomeScreen> {
         return PlaylistsScreen(onNavigateToPlayer: _navigateToPlayer);
       case 3:
         return const DiscoverScreen();
-      case 4:
-        return SettingsScreen(themeNotifier: widget.themeNotifier);
       default:
         return const SizedBox.shrink();
     }
@@ -66,8 +62,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(_titles[_selectedIndex]), centerTitle: true),
-      // IndexedStack keeps every visited screen alive, so switching tabs is
-      // instant and doesn't re-run initState (e.g. re-querying the library).
+      drawer: _buildDrawer(context),
       body: IndexedStack(
         index: _selectedIndex,
         children: List.generate(
@@ -85,21 +80,77 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.library_music),
             label: 'Library',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.music_note),
-            label: 'Player',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.music_note), label: 'Player'),
           BottomNavigationBarItem(
             icon: Icon(Icons.playlist_play),
             label: 'Playlists',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.explore),
-            label: 'Discover',
+          BottomNavigationBarItem(icon: Icon(Icons.explore), label: 'Discover'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDrawer(BuildContext context) {
+    final theme = Theme.of(context);
+    return Drawer(
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          DrawerHeader(
+            decoration: BoxDecoration(color: theme.colorScheme.primary),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Icon(Icons.music_note, color: Colors.white, size: 44),
+                SizedBox(height: 10),
+                Text(
+                  'Noir Player',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings),
-            label: 'Settings',
+          ListTile(
+            leading: const Icon(Icons.settings),
+            title: const Text('Settings'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              );
+            },
+          ),
+          ValueListenableBuilder<Duration?>(
+            valueListenable: SleepTimerService.instance.remaining,
+            builder: (_, remaining, __) => ListTile(
+              leading: const Icon(Icons.bedtime_outlined),
+              title: const Text('Sleep Timer'),
+              subtitle: remaining != null
+                  ? Text('Stops in ${formatTimerDuration(remaining)}')
+                  : null,
+              onTap: () {
+                Navigator.pop(context);
+                showSleepTimerSheet(context);
+              },
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.info_outline),
+            title: const Text('About'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AboutScreen()),
+              );
+            },
           ),
         ],
       ),

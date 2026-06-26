@@ -1,11 +1,16 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:audio_service/audio_service.dart';
+import 'package:audio_session/audio_session.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/playlist_model.dart';
+import 'settings_service.dart';
 
 late final AudioHandler audioHandler;
 bool _isInitialized = false;
@@ -25,6 +30,8 @@ Future<void> initAudioService() async {
       androidNotificationOngoing: true,
       androidShowNotificationBadge: true,
       androidNotificationIcon: 'mipmap/ic_launcher',
+      fastForwardInterval: Duration(seconds: 10),
+      rewindInterval: Duration(seconds: 10),
     ),
   );
 
@@ -46,10 +53,24 @@ class AudioPlayerHandler extends BaseAudioHandler {
   /// Cache of songId -> artwork file uri so we only extract artwork once.
   final Map<int, Uri?> _artCache = {};
 
+  /// Whether the user wants playback to continue — used to auto-resume after a
+  /// phone-call interruption ends.
+  bool _playIntent = false;
+
+  static const _kLastSong = 'playback.lastSong';
+
   Stream<Duration> get positionStream => _player.positionStream;
 
   AudioPlayerHandler() {
     _player.setLoopMode(LoopMode.all);
+    _player.setSpeed(SettingsService.instance.playbackSpeed);
+    _configureAudioSession();
+
+    // Periodically remember the current song + position so it can be resumed
+    // on next launch.
+    Timer.periodic(const Duration(seconds: 5), (_) {
+      if (_player.playing) _saveLastSong();
+    });
 
     // Drive the audio_service playback state (notification, lock screen,
     // system media controls) from just_audio's events.
@@ -84,15 +105,22 @@ class AudioPlayerHandler extends BaseAudioHandler {
 
   void _broadcastState(PlaybackEvent event) {
     final playing = _player.playing;
+    final showSeek = SettingsService.instance.seekButtonsInNotification;
+
+    // Buttons shown in the notification.
+    final controls = <MediaControl>[
+      MediaControl.skipToPrevious,
+      if (showSeek) MediaControl.rewind,
+      if (playing) MediaControl.pause else MediaControl.play,
+      if (showSeek) MediaControl.fastForward,
+      MediaControl.skipToNext,
+    ];
+    // The compact view always shows prev / play-pause / next.
+    final compactIndices = showSeek ? const [0, 2, 4] : const [0, 1, 2];
 
     playbackState.add(
       playbackState.value.copyWith(
-        // Buttons shown in the notification.
-        controls: [
-          MediaControl.skipToPrevious,
-          if (playing) MediaControl.pause else MediaControl.play,
-          MediaControl.skipToNext,
-        ],
+        controls: controls,
         // Actions the system UI (lock screen / expanded media player /
         // OxygenOS dynamic island) is allowed to invoke. Without these the
         // lock-screen and pop-up controls appear but do nothing.
@@ -105,8 +133,10 @@ class AudioPlayerHandler extends BaseAudioHandler {
           MediaAction.seek,
           MediaAction.seekForward,
           MediaAction.seekBackward,
+          MediaAction.fastForward,
+          MediaAction.rewind,
         },
-        androidCompactActionIndices: const [0, 1, 2],
+        androidCompactActionIndices: compactIndices,
         processingState: _mapState(_player.processingState),
         playing: playing,
         updatePosition: _player.position,
@@ -246,6 +276,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
       } else {
         await _player.seek(Duration.zero, index: index);
       }
+      _playIntent = true;
       await _player.play();
     } catch (e) {
       debugPrint('❌ Error playing song at $index: $e');
@@ -276,18 +307,136 @@ class AudioPlayerHandler extends BaseAudioHandler {
   Future<void> skipToQueueItem(int index) => playSongAt(index);
 
   @override
-  Future<void> play() => _player.play();
+  Future<void> play() {
+    _playIntent = true;
+    return _player.play();
+  }
 
   @override
-  Future<void> pause() => _player.pause();
+  Future<void> pause() {
+    _playIntent = false;
+    _saveLastSong();
+    return _player.pause();
+  }
 
   @override
   Future<void> seek(Duration position) => _player.seek(position);
 
   @override
+  Future<void> fastForward() => _seekBy(SettingsService.instance.seekInterval);
+
+  @override
+  Future<void> rewind() => _seekBy(-SettingsService.instance.seekInterval);
+
+  Future<void> _seekBy(Duration offset) async {
+    final duration = _player.duration ?? Duration.zero;
+    var target = _player.position + offset;
+    if (target < Duration.zero) target = Duration.zero;
+    if (duration > Duration.zero && target > duration) target = duration;
+    await _player.seek(target);
+  }
+
+  /// Change playback speed and persist it.
+  @override
+  Future<void> setSpeed(double speed) async {
+    await _player.setSpeed(speed);
+    await SettingsService.instance.setPlaybackSpeed(speed);
+  }
+
+  @override
   Future<void> stop() async {
+    _playIntent = false;
+    _saveLastSong();
     await _player.stop();
     await super.stop();
+  }
+
+  @override
+  Future<void> onTaskRemoved() async {
+    if (SettingsService.instance.stopOnAppSwipe) {
+      await stop();
+    }
+    await super.onTaskRemoved();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Audio focus / interruptions
+  // ---------------------------------------------------------------------------
+
+  Future<void> _configureAudioSession() async {
+    try {
+      final session = await AudioSession.instance;
+      await session.configure(const AudioSessionConfiguration.music());
+      // just_audio pauses on interruption begin; resume on end when the user
+      // still intends to play and the "resume after a call" setting is on.
+      session.interruptionEventStream.listen((event) {
+        if (!event.begin &&
+            event.type == AudioInterruptionType.pause &&
+            _playIntent &&
+            SettingsService.instance.resumeAfterCall) {
+          _player.play();
+        }
+      });
+    } catch (e) {
+      debugPrint('❌ Audio session config failed: $e');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Resume-last-song persistence
+  // ---------------------------------------------------------------------------
+
+  void _saveLastSong() {
+    final index = _player.currentIndex;
+    if (index == null || index < 0 || index >= _songs.length) return;
+    final item = mediaItem.value;
+    if (item == null) return;
+    final data = jsonEncode({
+      'id': item.id,
+      'title': item.title,
+      'artist': item.artist,
+      'album': item.album,
+      'path': _pathOf(_songs[index]),
+      'durationMs': item.duration?.inMilliseconds,
+      'positionMs': _player.position.inMilliseconds,
+    });
+    SharedPreferences.getInstance().then((p) => p.setString(_kLastSong, data));
+  }
+
+  /// Restore the last played song (paused, at its saved position) on launch.
+  Future<void> restoreLastSong() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_kLastSong);
+      if (raw == null) return;
+
+      final data = jsonDecode(raw) as Map<String, dynamic>;
+      final path = data['path'] as String?;
+      if (path == null || !await File(path).exists()) return;
+
+      final item = MediaItem(
+        id: (data['id'] ?? '').toString(),
+        title: (data['title'] ?? '') as String,
+        artist: (data['artist'] ?? '') as String,
+        album: (data['album'] ?? '') as String,
+        duration: data['durationMs'] != null
+            ? Duration(milliseconds: data['durationMs'] as int)
+            : null,
+      );
+
+      queue.add([item]);
+      mediaItem.add(item);
+      await _player.setAudioSources(
+        [AudioSource.uri(Uri.file(path), tag: item)],
+        initialIndex: 0,
+        initialPosition: Duration(milliseconds: (data['positionMs'] ?? 0) as int),
+      );
+      // The next library tap rebuilds the real queue.
+      _sourceMatchesQueue = false;
+      _songs = [];
+    } catch (e) {
+      debugPrint('❌ Error restoring last song: $e');
+    }
   }
 
   AudioProcessingState _mapState(ProcessingState state) {
