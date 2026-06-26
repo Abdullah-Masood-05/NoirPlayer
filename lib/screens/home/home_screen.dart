@@ -203,21 +203,25 @@ class _HomeScreenState extends State<HomeScreen>
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  theme.colorScheme.primary,
-                  theme.colorScheme.primary.withValues(alpha: 0.65),
+                  theme.colorScheme.primary.withValues(alpha: 0.45),
+                  theme.scaffoldBackgroundColor,
                 ],
               ),
             ),
-            child: const Column(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Icon(Icons.music_note, color: Colors.white, size: 44),
-                SizedBox(height: 10),
+                Icon(
+                  Icons.music_note,
+                  color: theme.colorScheme.primary,
+                  size: 44,
+                ),
+                const SizedBox(height: 10),
                 Text(
                   'Noir Player',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: theme.colorScheme.onSurface,
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                   ),
