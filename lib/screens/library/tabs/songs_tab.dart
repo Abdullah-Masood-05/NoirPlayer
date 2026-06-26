@@ -2,6 +2,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:noir_player/core/services/audio_handler.dart';
 import 'package:noir_player/core/services/playlist_service.dart';
+import 'package:noir_player/core/services/settings_service.dart';
 import 'package:on_audio_query/on_audio_query.dart' hide PlaylistModel;
 import 'package:permission_handler/permission_handler.dart';
 import '../../../core/models/playlist_model.dart';
@@ -10,7 +11,14 @@ import '../../../widgets/now_playing_indicator.dart';
 class SongsTab extends StatefulWidget {
   final VoidCallback onNavigateToPlayer;
 
-  const SongsTab({super.key, required this.onNavigateToPlayer});
+  /// When true, only show audios from the selected music folder.
+  final bool musicFolderOnly;
+
+  const SongsTab({
+    super.key,
+    required this.onNavigateToPlayer,
+    this.musicFolderOnly = false,
+  });
 
   @override
   State<SongsTab> createState() => _SongsTabState();
@@ -25,6 +33,29 @@ class _SongsTabState extends State<SongsTab> {
   void initState() {
     super.initState();
     _requestPermissionAndLoad();
+    if (widget.musicFolderOnly) {
+      SettingsService.instance.addListener(_onSettingsChanged);
+    }
+  }
+
+  @override
+  void dispose() {
+    if (widget.musicFolderOnly) {
+      SettingsService.instance.removeListener(_onSettingsChanged);
+    }
+    super.dispose();
+  }
+
+  void _onSettingsChanged() {
+    if (mounted) setState(() {});
+  }
+
+  /// Filter to the chosen music folder when this is the Music tab.
+  List<SongModel> _folderFiltered(List<SongModel> songs) {
+    if (!widget.musicFolderOnly) return songs;
+    return songs
+        .where((s) => SettingsService.instance.isInMusicFolder(s.data))
+        .toList();
   }
 
   Future<void> _requestPermissionAndLoad() async {
@@ -88,10 +119,11 @@ class _SongsTabState extends State<SongsTab> {
     widget.onNavigateToPlayer();
 
     final handler = audioHandler as AudioPlayerHandler;
-    final tappedIndex = _songs.indexWhere((s) => s.id == song.id);
+    final queueSongs = _folderFiltered(_songs);
+    final tappedIndex = queueSongs.indexWhere((s) => s.id == song.id);
 
     if (tappedIndex != -1) {
-      handler.setQueue(_songs);
+      handler.setQueue(queueSongs);
       await handler.playSongAt(tappedIndex);
     } else {
       await handler.playSong(song);
@@ -348,7 +380,7 @@ class _SongsTabState extends State<SongsTab> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final filteredSongs = _songs.where((song) {
+    final filteredSongs = _folderFiltered(_songs).where((song) {
       final lowerSearch = _searchText.toLowerCase();
       return song.title.toLowerCase().contains(lowerSearch) ||
           (song.artist ?? '').toLowerCase().contains(lowerSearch);

@@ -33,6 +33,10 @@ class SettingsService extends ChangeNotifier {
   /// Rewind / fast-forward step, in seconds.
   int seekIntervalSeconds = 10;
 
+  /// Folder the Library's "Music" tab loads from. Null = the device Music
+  /// folder (paths containing `/music/`).
+  String? musicFolderPath;
+
   // ── Keys ─────────────────────────────────────────────────────────────────
   static const _kTheme = 'settings.themeMode';
   static const _kResumeAfterCall = 'settings.resumeAfterCall';
@@ -41,6 +45,7 @@ class SettingsService extends ChangeNotifier {
   static const _kSeekButtons = 'settings.seekButtonsInNotification';
   static const _kPlaybackSpeed = 'settings.playbackSpeed';
   static const _kSeekInterval = 'settings.seekIntervalSeconds';
+  static const _kMusicFolder = 'settings.musicFolderPath';
 
   Future<void> load() async {
     final prefs = _prefs = await SharedPreferences.getInstance();
@@ -51,6 +56,24 @@ class SettingsService extends ChangeNotifier {
     seekButtonsInNotification = prefs.getBool(_kSeekButtons) ?? false;
     playbackSpeed = prefs.getDouble(_kPlaybackSpeed) ?? 1.0;
     seekIntervalSeconds = prefs.getInt(_kSeekInterval) ?? 10;
+    musicFolderPath = prefs.getString(_kMusicFolder);
+  }
+
+  /// A short display label for the chosen music folder.
+  String get musicFolderLabel {
+    final path = musicFolderPath;
+    if (path == null || path.isEmpty) return 'Music folder (default)';
+    final name = path.split('/').where((p) => p.isNotEmpty).lastOrNull;
+    return name == null || name.isEmpty ? path : name;
+  }
+
+  /// True if [songPath] belongs to the selected music folder.
+  bool isInMusicFolder(String songPath) {
+    final path = musicFolderPath;
+    if (path == null || path.isEmpty) {
+      return songPath.toLowerCase().contains('/music/');
+    }
+    return songPath.toLowerCase().startsWith(path.toLowerCase());
   }
 
   Duration get seekInterval => Duration(seconds: seekIntervalSeconds);
@@ -95,6 +118,17 @@ class SettingsService extends ChangeNotifier {
   Future<void> setSeekIntervalSeconds(int v) async {
     seekIntervalSeconds = v;
     await _prefs?.setInt(_kSeekInterval, v);
+    notifyListeners();
+  }
+
+  /// Pass null to reset to the default Music folder.
+  Future<void> setMusicFolderPath(String? path) async {
+    musicFolderPath = path;
+    if (path == null) {
+      await _prefs?.remove(_kMusicFolder);
+    } else {
+      await _prefs?.setString(_kMusicFolder, path);
+    }
     notifyListeners();
   }
 

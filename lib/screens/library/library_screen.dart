@@ -20,7 +20,7 @@ class _LibraryScreenState extends State<LibraryScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -54,8 +54,10 @@ class _LibraryScreenState extends State<LibraryScreen>
                 fontWeight: FontWeight.bold,
                 fontSize: 15,
               ),
+              isScrollable: false,
               tabs: const [
-                Tab(text: 'Songs'),
+                Tab(text: 'Music'),
+                Tab(text: 'Audio'),
                 Tab(text: 'Albums'),
                 Tab(text: 'Artists'),
               ],
@@ -64,6 +66,12 @@ class _LibraryScreenState extends State<LibraryScreen>
               child: TabBarView(
                 controller: _tabController,
                 children: [
+                  // Music: only audios from the chosen folder (default tab).
+                  SongsTab(
+                    onNavigateToPlayer: widget.onNavigateToPlayer,
+                    musicFolderOnly: true,
+                  ),
+                  // Audio: every audio file on the device.
                   SongsTab(onNavigateToPlayer: widget.onNavigateToPlayer),
                   const AlbumsTab(),
                   const ArtistsTab(),

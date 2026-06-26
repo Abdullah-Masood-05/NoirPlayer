@@ -17,12 +17,26 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
   int _selectedIndex = 0;
 
   // Tabs opened at least once, so the IndexedStack builds them lazily and keeps
   // their state once built.
   final Set<int> _visited = {0};
+
+  // Drives the transition played when switching tabs.
+  late final AnimationController _transition = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 350),
+    value: 1,
+  );
+
+  @override
+  void dispose() {
+    _transition.dispose();
+    super.dispose();
+  }
 
   final List<String> _titles = const [
     'Library',
@@ -32,17 +46,21 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   void _onItemTapped(int index) {
+    if (index == _selectedIndex) return;
     setState(() {
       _selectedIndex = index;
       _visited.add(index);
     });
+    _transition.forward(from: 0);
   }
 
   void _navigateToPlayer() {
+    if (_selectedIndex == 1) return;
     setState(() {
       _selectedIndex = 1;
       _visited.add(1);
     });
+    _transition.forward(from: 0);
   }
 
   Widget _buildScreen(int index) {
@@ -99,13 +117,37 @@ class _HomeScreenState extends State<HomeScreen> {
       body: Column(
         children: [
           Expanded(
-            child: IndexedStack(
-              index: _selectedIndex,
-              children: List.generate(
-                _titles.length,
-                (i) => _visited.contains(i)
-                    ? _buildScreen(i)
-                    : const SizedBox.shrink(),
+            child: AnimatedBuilder(
+              animation: _transition,
+              builder: (context, child) {
+                final t = Curves.easeOut.transform(_transition.value);
+                if (_selectedIndex == 1) {
+                  // Player tab: a distinct zoom + fade.
+                  return Opacity(
+                    opacity: t,
+                    child: Transform.scale(
+                      scale: 0.92 + 0.08 * t,
+                      child: child,
+                    ),
+                  );
+                }
+                // Other tabs: fade + a gentle horizontal slide.
+                return Opacity(
+                  opacity: t,
+                  child: Transform.translate(
+                    offset: Offset((1 - t) * 28, 0),
+                    child: child,
+                  ),
+                );
+              },
+              child: IndexedStack(
+                index: _selectedIndex,
+                children: List.generate(
+                  _titles.length,
+                  (i) => _visited.contains(i)
+                      ? _buildScreen(i)
+                      : const SizedBox.shrink(),
+                ),
               ),
             ),
           ),
