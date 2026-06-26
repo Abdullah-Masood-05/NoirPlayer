@@ -41,8 +41,15 @@ Future<void> initAudioService() async {
 bool isAudioServiceInitialized() => _isInitialized;
 
 class AudioPlayerHandler extends BaseAudioHandler {
-  final _player = AudioPlayer();
+  // Native Android equalizer, attached to the player's audio pipeline.
+  final AndroidEqualizer _equalizer = AndroidEqualizer();
+  late final AudioPlayer _player = AudioPlayer(
+    audioPipeline: AudioPipeline(androidAudioEffects: [_equalizer]),
+  );
   final OnAudioQuery _audioQuery = OnAudioQuery();
+
+  AndroidEqualizer get equalizer => _equalizer;
+  bool _equalizerApplied = false;
 
   /// Raw queue (SongModel / PlaylistSong), parallel to the published [queue].
   List<dynamic> _songs = [];
@@ -282,6 +289,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
           initialPosition: Duration.zero,
         );
         _sourceMatchesQueue = true;
+        _initEqualizer();
       } else {
         await _player.seek(Duration.zero, index: index);
       }
@@ -326,6 +334,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
       initialIndex: 0,
       initialPosition: Duration.zero,
     );
+    _initEqualizer();
     _playIntent = true;
     await _player.play();
   }
@@ -431,6 +440,24 @@ class AudioPlayerHandler extends BaseAudioHandler {
     await SettingsService.instance.setPlaybackSpeed(speed);
   }
 
+  /// Apply the saved equalizer settings once the native effect is ready
+  /// (its parameters resolve only after the first audio source loads).
+  Future<void> _initEqualizer() async {
+    if (_equalizerApplied) return;
+    _equalizerApplied = true;
+    try {
+      await _equalizer.setEnabled(SettingsService.instance.equalizerEnabled);
+      final params = await _equalizer.parameters;
+      final saved = SettingsService.instance.equalizerBandGains;
+      for (var i = 0; i < params.bands.length && i < saved.length; i++) {
+        await params.bands[i].setGain(saved[i]);
+      }
+    } catch (e) {
+      debugPrint('❌ Equalizer init failed: $e');
+      _equalizerApplied = false; // allow a retry on the next track
+    }
+  }
+
   @override
   Future<void> stop() async {
     _playIntent = false;
@@ -519,6 +546,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
         initialIndex: 0,
         initialPosition: Duration(milliseconds: (data['positionMs'] ?? 0) as int),
       );
+      _initEqualizer();
       // The next library tap rebuilds the real queue.
       _sourceMatchesQueue = false;
       _songs = [];

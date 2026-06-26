@@ -37,6 +37,10 @@ class SettingsService extends ChangeNotifier {
   /// folder (paths containing `/music/`).
   String? musicFolderPath;
 
+  /// Native equalizer state.
+  bool equalizerEnabled = false;
+  List<double> equalizerBandGains = const [];
+
   // ── Keys ─────────────────────────────────────────────────────────────────
   static const _kTheme = 'settings.themeMode';
   static const _kResumeAfterCall = 'settings.resumeAfterCall';
@@ -46,6 +50,8 @@ class SettingsService extends ChangeNotifier {
   static const _kPlaybackSpeed = 'settings.playbackSpeed';
   static const _kSeekInterval = 'settings.seekIntervalSeconds';
   static const _kMusicFolder = 'settings.musicFolderPath';
+  static const _kEqEnabled = 'settings.equalizerEnabled';
+  static const _kEqGains = 'settings.equalizerBandGains';
 
   Future<void> load() async {
     final prefs = _prefs = await SharedPreferences.getInstance();
@@ -57,6 +63,10 @@ class SettingsService extends ChangeNotifier {
     playbackSpeed = prefs.getDouble(_kPlaybackSpeed) ?? 1.0;
     seekIntervalSeconds = prefs.getInt(_kSeekInterval) ?? 10;
     musicFolderPath = prefs.getString(_kMusicFolder);
+    equalizerEnabled = prefs.getBool(_kEqEnabled) ?? false;
+    equalizerBandGains = (prefs.getStringList(_kEqGains) ?? const [])
+        .map((g) => double.tryParse(g) ?? 0.0)
+        .toList();
   }
 
   /// A short display label for the chosen music folder.
@@ -129,6 +139,21 @@ class SettingsService extends ChangeNotifier {
     } else {
       await _prefs?.setString(_kMusicFolder, path);
     }
+    notifyListeners();
+  }
+
+  Future<void> setEqualizerEnabled(bool v) async {
+    equalizerEnabled = v;
+    await _prefs?.setBool(_kEqEnabled, v);
+    notifyListeners();
+  }
+
+  Future<void> setEqualizerBandGains(List<double> gains) async {
+    equalizerBandGains = gains;
+    await _prefs?.setStringList(
+      _kEqGains,
+      gains.map((g) => g.toString()).toList(),
+    );
     notifyListeners();
   }
 

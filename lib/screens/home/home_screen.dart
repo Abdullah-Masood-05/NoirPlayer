@@ -5,6 +5,7 @@ import '../playlists/playlists_screen.dart';
 import '../discover/discover_screen.dart';
 import '../settings/settings_screen.dart';
 import '../about/about_screen.dart';
+import '../equalizer/equalizer_screen.dart';
 import '../../core/services/settings_service.dart';
 import '../../core/services/sleep_timer_service.dart';
 import '../../widgets/playback_menus.dart';
@@ -237,6 +238,17 @@ class _HomeScreenState extends State<HomeScreen>
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.graphic_eq),
+            title: const Text('Equalizer'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const EqualizerScreen()),
               );
             },
           ),
