@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:noir_player/core/services/audio_handler.dart';
 import 'package:on_audio_query/on_audio_query.dart' hide PlaylistModel;
@@ -177,7 +176,7 @@ class _SongsTabState extends State<SongsTab> {
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withOpacity(0.1),
+                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(20),
                     topRight: Radius.circular(20),
@@ -188,7 +187,7 @@ class _SongsTabState extends State<SongsTab> {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.primary.withOpacity(0.2),
+                        color: theme.colorScheme.primary.withValues(alpha: 0.2),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
@@ -218,7 +217,7 @@ class _SongsTabState extends State<SongsTab> {
                             style: TextStyle(
                               fontSize: 13,
                               color: theme.textTheme.bodyMedium?.color
-                                  ?.withOpacity(0.7),
+                                  ?.withValues(alpha: 0.7),
                             ),
                           ),
                         ],
@@ -245,6 +244,8 @@ class _SongsTabState extends State<SongsTab> {
                         onTap: alreadyAdded
                             ? null
                             : () async {
+                                final navigator = Navigator.of(ctx);
+                                final messenger = ScaffoldMessenger.of(context);
                                 playlist.songs.add(
                                   PlaylistSong(
                                     id: song.id,
@@ -255,22 +256,20 @@ class _SongsTabState extends State<SongsTab> {
                                   ),
                                 );
                                 await _savePlaylists();
+                                if (!mounted) return;
                                 setState(() {});
-                                Navigator.pop(ctx);
-                                
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        'Added "${song.title}" to ${playlist.name}',
-                                      ),
-                                      behavior: SnackBarBehavior.floating,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
+                                navigator.pop();
+                                messenger.showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Added "${song.title}" to ${playlist.name}',
                                     ),
-                                  );
-                                }
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                );
                               },
                         child: Container(
                           padding: const EdgeInsets.symmetric(
@@ -281,8 +280,8 @@ class _SongsTabState extends State<SongsTab> {
                             border: Border(
                               bottom: BorderSide(
                                 color: isDark
-                                    ? Colors.white.withOpacity(0.1)
-                                    : Colors.black.withOpacity(0.05),
+                                    ? Colors.white.withValues(alpha: 0.1)
+                                    : Colors.black.withValues(alpha: 0.05),
                                 width: 0.5,
                               ),
                             ),
@@ -293,9 +292,9 @@ class _SongsTabState extends State<SongsTab> {
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
                                   color: alreadyAdded
-                                      ? Colors.grey.withOpacity(0.2)
+                                      ? Colors.grey.withValues(alpha: 0.2)
                                       : theme.colorScheme.primary
-                                          .withOpacity(0.1),
+                                          .withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Icon(
@@ -322,7 +321,7 @@ class _SongsTabState extends State<SongsTab> {
                                         fontWeight: FontWeight.w600,
                                         color: alreadyAdded
                                             ? theme.textTheme.bodyMedium?.color
-                                                ?.withOpacity(0.5)
+                                                ?.withValues(alpha: 0.5)
                                             : theme.textTheme.titleMedium?.color,
                                       ),
                                     ),
@@ -332,7 +331,7 @@ class _SongsTabState extends State<SongsTab> {
                                       style: TextStyle(
                                         fontSize: 12,
                                         color: theme.textTheme.bodyMedium?.color
-                                            ?.withOpacity(0.6),
+                                            ?.withValues(alpha: 0.6),
                                       ),
                                     ),
                                   ],
@@ -341,7 +340,7 @@ class _SongsTabState extends State<SongsTab> {
                               if (alreadyAdded)
                                 Icon(
                                   Icons.check_circle,
-                                  color: Colors.green.withOpacity(0.7),
+                                  color: Colors.green.withValues(alpha: 0.7),
                                   size: 20,
                                 ),
                             ],
@@ -411,8 +410,8 @@ class _SongsTabState extends State<SongsTab> {
               boxShadow: [
                 BoxShadow(
                   color: isDark
-                      ? Colors.black.withOpacity(0.2)
-                      : Colors.grey.withOpacity(0.1),
+                      ? Colors.black.withValues(alpha: 0.2)
+                      : Colors.grey.withValues(alpha: 0.1),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -425,17 +424,17 @@ class _SongsTabState extends State<SongsTab> {
               decoration: InputDecoration(
                 hintText: 'Search songs or artists...',
                 hintStyle: TextStyle(
-                  color: theme.textTheme.bodyMedium?.color?.withOpacity(0.5),
+                  color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.5),
                 ),
                 prefixIcon: Icon(
                   Icons.search,
-                  color: theme.iconTheme.color?.withOpacity(0.7),
+                  color: theme.iconTheme.color?.withValues(alpha: 0.7),
                 ),
                 suffixIcon: _searchText.isNotEmpty
                     ? IconButton(
                         icon: Icon(
                           Icons.clear,
-                          color: theme.iconTheme.color?.withOpacity(0.7),
+                          color: theme.iconTheme.color?.withValues(alpha: 0.7),
                         ),
                         onPressed: () => setState(() => _searchText = ''),
                       )
@@ -477,7 +476,7 @@ class _SongsTabState extends State<SongsTab> {
                           Icon(
                             Icons.search_off,
                             size: 64,
-                            color: theme.iconTheme.color?.withOpacity(0.3),
+                            color: theme.iconTheme.color?.withValues(alpha: 0.3),
                           ),
                           const SizedBox(height: 16),
                           Text(
@@ -493,7 +492,7 @@ class _SongsTabState extends State<SongsTab> {
                             'Try a different search term',
                             style: TextStyle(
                               color: theme.textTheme.bodyMedium?.color
-                                  ?.withOpacity(0.7),
+                                  ?.withValues(alpha: 0.7),
                             ),
                           ),
                         ],
@@ -530,9 +529,9 @@ class _SongsTabState extends State<SongsTab> {
                               color: Colors.transparent,
                               child: InkWell(
                                 splashColor:
-                                    theme.colorScheme.primary.withOpacity(0.1),
+                                    theme.colorScheme.primary.withValues(alpha: 0.1),
                                 highlightColor:
-                                    theme.colorScheme.primary.withOpacity(0.05),
+                                    theme.colorScheme.primary.withValues(alpha: 0.05),
                                 onTap: () => _playSongAndNavigate(song, context),
                                 onLongPress: () => _addSongToPlaylist(song),
                                 child: Container(
@@ -544,8 +543,8 @@ class _SongsTabState extends State<SongsTab> {
                                     border: Border(
                                       bottom: BorderSide(
                                         color: isDark
-                                            ? Colors.white.withOpacity(0.05)
-                                            : Colors.black.withOpacity(0.03),
+                                            ? Colors.white.withValues(alpha: 0.05)
+                                            : Colors.black.withValues(alpha: 0.03),
                                         width: 0.5,
                                       ),
                                     ),
@@ -565,9 +564,9 @@ class _SongsTabState extends State<SongsTab> {
                                               BoxShadow(
                                                 color: isDark
                                                     ? Colors.black
-                                                        .withOpacity(0.3)
+                                                        .withValues(alpha: 0.3)
                                                     : Colors.grey
-                                                        .withOpacity(0.2),
+                                                        .withValues(alpha: 0.2),
                                                 blurRadius: 4,
                                                 offset: const Offset(0, 2),
                                               ),
@@ -625,7 +624,7 @@ class _SongsTabState extends State<SongsTab> {
                                                 fontSize: 13,
                                                 color: theme
                                                     .textTheme.bodyMedium?.color
-                                                    ?.withOpacity(0.7),
+                                                    ?.withValues(alpha: 0.7),
                                               ),
                                             ),
                                           ],
@@ -640,8 +639,8 @@ class _SongsTabState extends State<SongsTab> {
                                         ),
                                         decoration: BoxDecoration(
                                           color: isDark
-                                              ? Colors.white.withOpacity(0.05)
-                                              : Colors.black.withOpacity(0.03),
+                                              ? Colors.white.withValues(alpha: 0.05)
+                                              : Colors.black.withValues(alpha: 0.03),
                                           borderRadius: BorderRadius.circular(8),
                                         ),
                                         child: Text(
@@ -651,7 +650,7 @@ class _SongsTabState extends State<SongsTab> {
                                             fontWeight: FontWeight.w500,
                                             color: theme
                                                 .textTheme.bodySmall?.color
-                                                ?.withOpacity(0.8),
+                                                ?.withValues(alpha: 0.8),
                                           ),
                                         ),
                                       ),

@@ -59,7 +59,7 @@ class _PlaylistSongsScreenState extends State<PlaylistSongsScreen> {
                 width: 64,
                 height: 64,
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
+                  color: Colors.red.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -87,7 +87,7 @@ class _PlaylistSongsScreenState extends State<PlaylistSongsScreen> {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 15,
-                  color: theme.textTheme.bodyMedium?.color?.withOpacity(0.8),
+                  color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.8),
                   height: 1.4,
                 ),
               ),
@@ -97,7 +97,7 @@ class _PlaylistSongsScreenState extends State<PlaylistSongsScreen> {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 13,
-                  color: Colors.red.withOpacity(0.7),
+                  color: Colors.red.withValues(alpha: 0.7),
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -271,12 +271,12 @@ class _PlaylistSongsScreenState extends State<PlaylistSongsScreen> {
                         ),
                       ),
                       subtitle: Text(
-                        song.artist ?? 'Unknown Artist',
+                        song.artist,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 13,
-                          color: theme.textTheme.bodyMedium?.color?.withOpacity(
+                          color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 
                             0.7,
                           ),
                         ),
@@ -288,8 +288,8 @@ class _PlaylistSongsScreenState extends State<PlaylistSongsScreen> {
                         ),
                         decoration: BoxDecoration(
                           color: isDark
-                              ? Colors.white.withOpacity(0.05)
-                              : Colors.black.withOpacity(0.03),
+                              ? Colors.white.withValues(alpha: 0.05)
+                              : Colors.black.withValues(alpha: 0.03),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
@@ -298,7 +298,7 @@ class _PlaylistSongsScreenState extends State<PlaylistSongsScreen> {
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
                             color: theme.textTheme.bodySmall?.color
-                                ?.withOpacity(0.8),
+                                ?.withValues(alpha: 0.8),
                           ),
                         ),
                       ),

@@ -18,6 +18,11 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
 
+  // Tabs opened at least once. Lets the IndexedStack build screens lazily (so
+  // e.g. Discover doesn't hit the network until first opened) while keeping
+  // each one alive — and its state — once built.
+  final Set<int> _visited = {0};
+
   final List<String> _titles = const [
     'Library',
     'Now Playing',
@@ -29,46 +34,46 @@ class _HomeScreenState extends State<HomeScreen> {
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
+      _visited.add(index);
     });
   }
 
   void _navigateToPlayer() {
     setState(() {
       _selectedIndex = 1;
+      _visited.add(1);
     });
+  }
+
+  Widget _buildScreen(int index) {
+    switch (index) {
+      case 0:
+        return LibraryScreen(onNavigateToPlayer: _navigateToPlayer);
+      case 1:
+        return const PlayerScreen();
+      case 2:
+        return PlaylistsScreen(onNavigateToPlayer: _navigateToPlayer);
+      case 3:
+        return const DiscoverScreen();
+      case 4:
+        return SettingsScreen(themeNotifier: widget.themeNotifier);
+      default:
+        return const SizedBox.shrink();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final List<Widget> screens = [
-      LibraryScreen(onNavigateToPlayer: _navigateToPlayer),
-      const PlayerScreen(),
-      PlaylistsScreen(onNavigateToPlayer: _navigateToPlayer),
-      const DiscoverScreen(),
-      SettingsScreen(themeNotifier: widget.themeNotifier), // 👈 FIXED HERE
-    ];
-
     return Scaffold(
       appBar: AppBar(title: Text(_titles[_selectedIndex]), centerTitle: true),
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        switchInCurve: Curves.easeInOut,
-        switchOutCurve: Curves.easeInOut,
-        transitionBuilder: (child, animation) {
-          return FadeTransition(
-            opacity: animation,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0.1, 0.0),
-                end: Offset.zero,
-              ).animate(animation),
-              child: child,
-            ),
-          );
-        },
-        child: Container(
-          key: ValueKey<int>(_selectedIndex),
-          child: screens[_selectedIndex],
+      // IndexedStack keeps every visited screen alive, so switching tabs is
+      // instant and doesn't re-run initState (e.g. re-querying the library).
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: List.generate(
+          _titles.length,
+          (i) =>
+              _visited.contains(i) ? _buildScreen(i) : const SizedBox.shrink(),
         ),
       ),
       bottomNavigationBar: BottomNavigationBar(

@@ -14,7 +14,6 @@ class AppTheme {
       primary: deepRed,
       secondary: deepRed,
       surface: cardColor,
-      background: darkBackground,
     ),
     appBarTheme: const AppBarTheme(
       backgroundColor: cardColor,
@@ -45,7 +44,6 @@ class AppTheme {
       primary: deepRed,
       secondary: deepRed,
       surface: Colors.white,
-      background: Colors.white,
     ),
     appBarTheme: const AppBarTheme(
       backgroundColor: Colors.white,

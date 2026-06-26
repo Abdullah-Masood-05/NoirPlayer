@@ -40,33 +40,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 fontWeight: FontWeight.w600,
                 color: Theme.of(
                   context,
-                ).textTheme.bodySmall?.color?.withOpacity(0.7),
+                ).textTheme.bodySmall?.color?.withValues(alpha: 0.7),
               ),
             ),
           ),
-          RadioListTile<ThemeMode>(
-            title: const Text('System Default'),
-            subtitle: const Text('Follow system theme setting'),
-            value: ThemeMode.system,
+          RadioGroup<ThemeMode>(
             groupValue: _currentThemeMode,
             onChanged: _changeThemeMode,
-            secondary: const Icon(Icons.brightness_auto),
-          ),
-          RadioListTile<ThemeMode>(
-            title: const Text('Light Mode'),
-            subtitle: const Text('Always use light theme'),
-            value: ThemeMode.light,
-            groupValue: _currentThemeMode,
-            onChanged: _changeThemeMode,
-            secondary: const Icon(Icons.light_mode),
-          ),
-          RadioListTile<ThemeMode>(
-            title: const Text('Dark Mode'),
-            subtitle: const Text('Always use dark theme'),
-            value: ThemeMode.dark,
-            groupValue: _currentThemeMode,
-            onChanged: _changeThemeMode,
-            secondary: const Icon(Icons.dark_mode),
+            child: Column(
+              children: const [
+                RadioListTile<ThemeMode>(
+                  title: Text('System Default'),
+                  subtitle: Text('Follow system theme setting'),
+                  value: ThemeMode.system,
+                  secondary: Icon(Icons.brightness_auto),
+                ),
+                RadioListTile<ThemeMode>(
+                  title: Text('Light Mode'),
+                  subtitle: Text('Always use light theme'),
+                  value: ThemeMode.light,
+                  secondary: Icon(Icons.light_mode),
+                ),
+                RadioListTile<ThemeMode>(
+                  title: Text('Dark Mode'),
+                  subtitle: Text('Always use dark theme'),
+                  value: ThemeMode.dark,
+                  secondary: Icon(Icons.dark_mode),
+                ),
+              ],
+            ),
           ),
         ],
       ),

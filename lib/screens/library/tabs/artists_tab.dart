@@ -198,8 +198,8 @@ class _ArtistsTabState extends State<ArtistsTab> {
                                   end: Alignment.bottomCenter,
                                   colors: [
                                     Colors.transparent,
-                                    Colors.black.withOpacity(0.7),
-                                    Colors.black.withOpacity(0.85),
+                                    Colors.black.withValues(alpha: 0.7),
+                                    Colors.black.withValues(alpha: 0.85),
                                   ],
                                 ),
                               ),
@@ -229,7 +229,7 @@ class _ArtistsTabState extends State<ArtistsTab> {
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: Colors.white.withOpacity(0.8),
+                                      color: Colors.white.withValues(alpha: 0.8),
                                     ),
                                   ),
                                 ],

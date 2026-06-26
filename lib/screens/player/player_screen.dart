@@ -14,13 +14,22 @@ class PlayerScreen extends StatefulWidget {
 class _PlayerScreenState extends State<PlayerScreen> {
   final OnAudioQuery _audioQuery = OnAudioQuery();
 
-  Future<Uint8List?> _loadArtwork(int songId) async {
-    return await _audioQuery.queryArtwork(
-      songId,
-      ArtworkType.AUDIO,
-      format: ArtworkFormat.JPEG,
-      size: 800,
-    );
+  // Cache the artwork future per song so it isn't re-fetched (and the image
+  // re-decoded / flashed) on every rebuild — e.g. each time play/pause toggles.
+  int? _artSongId;
+  Future<Uint8List?>? _artFuture;
+
+  Future<Uint8List?> _artworkFor(int songId) {
+    if (_artSongId != songId || _artFuture == null) {
+      _artSongId = songId;
+      _artFuture = _audioQuery.queryArtwork(
+        songId,
+        ArtworkType.AUDIO,
+        format: ArtworkFormat.JPEG,
+        size: 800,
+      );
+    }
+    return _artFuture!;
   }
 
   @override
@@ -70,7 +79,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         // 🎵 Album Art
                         if (songId != null)
                           FutureBuilder<Uint8List?>(
-                            future: _loadArtwork(songId),
+                            future: _artworkFor(songId),
                             builder: (context, artSnapshot) {
                               if (artSnapshot.connectionState ==
                                   ConnectionState.waiting) {
@@ -97,6 +106,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                     width: 200,
                                     height: 200,
                                     fit: BoxFit.cover,
+                                    gaplessPlayback: true,
+                                    // Decode near display size instead of the
+                                    // full 800px to save memory/decode time.
+                                    cacheWidth: 600,
+                                    cacheHeight: 600,
                                   ),
                                 );
                               }

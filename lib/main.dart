@@ -13,7 +13,13 @@ void main() async {
   try {
     await dotenv.load();
   } catch (_) {}
-  await initAudioService();
+  // Don't let an audio-service init failure block the UI from starting.
+  // Screens guard usage with isAudioServiceInitialized().
+  try {
+    await initAudioService();
+  } catch (e) {
+    debugPrint('Audio service init failed: $e');
+  }
   timeDilation = 1.0;
   runApp(NoirPlayerApp());
 }

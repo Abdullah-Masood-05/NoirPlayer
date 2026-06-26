@@ -85,7 +85,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                 width: 64,
                 height: 64,
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
+                  color: Colors.red.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -113,7 +113,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 15,
-                  color: theme.textTheme.bodyMedium?.color?.withOpacity(0.8),
+                  color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.8),
                   height: 1.4,
                 ),
               ),
@@ -123,7 +123,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 13,
-                  color: Colors.red.withOpacity(0.7),
+                  color: Colors.red.withValues(alpha: 0.7),
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -243,8 +243,8 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
               borderRadius: BorderRadius.circular(16),
               child: InkWell(
                 borderRadius: BorderRadius.circular(16),
-                splashColor: theme.colorScheme.primary.withOpacity(0.15),
-                highlightColor: theme.colorScheme.primary.withOpacity(0.08),
+                splashColor: theme.colorScheme.primary.withValues(alpha: 0.15),
+                highlightColor: theme.colorScheme.primary.withValues(alpha: 0.08),
                 onTap: () {
                   Navigator.push(
                     context,
@@ -290,8 +290,8 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                     boxShadow: [
                       BoxShadow(
                         color: isDark
-                            ? Colors.black.withOpacity(0.3)
-                            : Colors.grey.withOpacity(0.2),
+                            ? Colors.black.withValues(alpha: 0.3)
+                            : Colors.grey.withValues(alpha: 0.2),
                         blurRadius: 8,
                         offset: const Offset(0, 4),
                       ),
@@ -339,7 +339,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                                       padding: const EdgeInsets.all(16),
                                       decoration: BoxDecoration(
                                         color: theme.colorScheme.primary
-                                            .withOpacity(0.1),
+                                            .withValues(alpha: 0.1),
                                         shape: BoxShape.circle,
                                       ),
                                       child: Icon(
@@ -365,8 +365,8 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                                   child: Container(
                                     decoration: BoxDecoration(
                                       color: isDark
-                                          ? Colors.black.withOpacity(0.4)
-                                          : Colors.white.withOpacity(0.7),
+                                          ? Colors.black.withValues(alpha: 0.4)
+                                          : Colors.white.withValues(alpha: 0.7),
                                       shape: BoxShape.circle,
                                     ),
                                     child: Icon(
@@ -386,7 +386,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                           padding: const EdgeInsets.all(12.0),
                           decoration: BoxDecoration(
                             color: isDark
-                                ? Colors.grey[850]?.withOpacity(0.5)
+                                ? Colors.grey[850]?.withValues(alpha: 0.5)
                                 : Colors.grey[100],
                           ),
                           child: Column(
@@ -409,7 +409,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                                     Icons.music_note,
                                     size: 14,
                                     color: theme.textTheme.bodyMedium?.color
-                                        ?.withOpacity(0.6),
+                                        ?.withValues(alpha: 0.6),
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
@@ -417,7 +417,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: theme.textTheme.bodyMedium?.color
-                                          ?.withOpacity(0.7),
+                                          ?.withValues(alpha: 0.7),
                                     ),
                                   ),
                                 ],

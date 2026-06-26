@@ -87,7 +87,7 @@ class _PlaylistsTabState extends State<PlaylistsTab> {
                   width: 64,
                   height: 64,
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withOpacity(0.1),
+                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
@@ -207,7 +207,7 @@ class _PlaylistsTabState extends State<PlaylistsTab> {
                 width: 64,
                 height: 64,
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
+                  color: Colors.red.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -235,7 +235,7 @@ class _PlaylistsTabState extends State<PlaylistsTab> {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 15,
-                  color: theme.textTheme.bodyMedium?.color?.withOpacity(0.8),
+                  color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.8),
                   height: 1.4,
                 ),
               ),
@@ -245,7 +245,7 @@ class _PlaylistsTabState extends State<PlaylistsTab> {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 13,
-                  color: Colors.red.withOpacity(0.7),
+                  color: Colors.red.withValues(alpha: 0.7),
                   fontWeight: FontWeight.w500,
                 ),
               ),

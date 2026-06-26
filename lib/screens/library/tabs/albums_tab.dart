@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:noir_player/screens/player/player_screen.dart';
 import 'package:on_audio_query/on_audio_query.dart';
-import 'package:noir_player/core/services/audio_handler.dart';
 import '../../albums/album_songs_screen.dart';
 
 class AlbumsTab extends StatefulWidget {
@@ -151,8 +150,8 @@ class _AlbumsTabState extends State<AlbumsTab> {
                               end: Alignment.bottomCenter,
                               colors: [
                                 Colors.transparent,
-                                Colors.black.withOpacity(0.7),
-                                Colors.black.withOpacity(0.85),
+                                Colors.black.withValues(alpha: 0.7),
+                                Colors.black.withValues(alpha: 0.85),
                               ],
                             ),
                           ),
@@ -182,7 +181,7 @@ class _AlbumsTabState extends State<AlbumsTab> {
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.white.withOpacity(0.8),
+                                  color: Colors.white.withValues(alpha: 0.8),
                                 ),
                               ),
                             ],

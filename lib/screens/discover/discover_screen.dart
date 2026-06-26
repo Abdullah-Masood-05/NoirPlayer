@@ -204,7 +204,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           decoration: InputDecoration(
             hintText: 'Search songs...',
             hintStyle: TextStyle(
-              color: theme.textTheme.bodyMedium?.color?.withOpacity(0.5),
+              color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.5),
             ),
             border: InputBorder.none,
             suffixIcon: _searchController.text.isNotEmpty
@@ -235,13 +235,13 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                   Icon(
                     Icons.music_off,
                     size: 64,
-                    color: theme.textTheme.bodyMedium?.color?.withOpacity(0.3),
+                    color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.3),
                   ),
                   const SizedBox(height: 16),
                   Text(
                     _isSearching ? 'No results found' : 'No tracks available',
                     style: TextStyle(
-                      color: theme.textTheme.bodyMedium?.color?.withOpacity(
+                      color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 
                         0.6,
                       ),
                     ),
@@ -277,7 +277,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                               errorBuilder: (_, __, ___) => Container(
                                 width: 56,
                                 height: 56,
-                                color: theme.colorScheme.primary.withOpacity(
+                                color: theme.colorScheme.primary.withValues(alpha: 
                                   0.1,
                                 ),
                                 child: Icon(
@@ -291,7 +291,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                             width: 56,
                             height: 56,
                             decoration: BoxDecoration(
-                              color: theme.colorScheme.primary.withOpacity(0.1),
+                              color: theme.colorScheme.primary.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Icon(

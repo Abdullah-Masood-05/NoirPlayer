@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:on_audio_query/on_audio_query.dart';
@@ -17,10 +18,11 @@ Future<void> initAudioService() async {
     config: const AudioServiceConfig(
       androidNotificationChannelId: 'com.example.noir_player.channel.audio',
       androidNotificationChannelName: 'Noir Player',
+      // Keep the notification ongoing and the service in the foreground even
+      // while paused. This stops aggressive OEM memory management (e.g.
+      // OxygenOS) from killing the backgrounded process, which otherwise leaves
+      // the app frozen / unable to play when reopened from recents.
       androidNotificationOngoing: true,
-      // Required companion to androidNotificationOngoing: lets the service
-      // leave the foreground (and the notification be dismissed) while paused.
-      androidStopForegroundOnPause: true,
       androidShowNotificationBadge: true,
       androidNotificationIcon: 'mipmap/ic_launcher',
     ),
@@ -54,20 +56,26 @@ class AudioPlayerHandler extends BaseAudioHandler {
     _player.playbackEventStream.listen(
       _broadcastState,
       onError: (Object e, StackTrace st) =>
-          print('❌ Playback event error: $e'),
+          debugPrint('❌ Playback event error: $e'),
     );
 
     // Whenever the current track changes, update the now-playing MediaItem
     // (title/artist/album + lazily-loaded artwork).
-    _player.currentIndexStream.listen(_updateMediaItemForIndex);
+    _player.currentIndexStream.listen(
+      _updateMediaItemForIndex,
+      onError: (Object e, StackTrace st) => debugPrint('❌ currentIndex error: $e'),
+    );
 
     // Keep the MediaItem duration in sync once just_audio knows it.
-    _player.durationStream.listen((duration) {
-      final item = mediaItem.value;
-      if (item != null && duration != null && item.duration != duration) {
-        mediaItem.add(item.copyWith(duration: duration));
-      }
-    });
+    _player.durationStream.listen(
+      (duration) {
+        final item = mediaItem.value;
+        if (item != null && duration != null && item.duration != duration) {
+          mediaItem.add(item.copyWith(duration: duration));
+        }
+      },
+      onError: (Object e, StackTrace st) => debugPrint('❌ duration error: $e'),
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -171,7 +179,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
       _artCache[songId] = uri;
       return uri;
     } catch (e) {
-      print('❌ Error loading artwork for $songId: $e');
+      debugPrint('❌ Error loading artwork for $songId: $e');
       _artCache[songId] = null;
       return null;
     }
@@ -216,7 +224,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
     _songs = songs;
     _sourceMatchesQueue = false;
     queue.add(songs.map(_toMediaItem).toList());
-    print('🎶 Queue set with ${songs.length} songs');
+    debugPrint('🎶 Queue set with ${songs.length} songs');
   }
 
   Future<void> playSongAt(int index) async {
@@ -240,7 +248,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
       }
       await _player.play();
     } catch (e) {
-      print('❌ Error playing song at $index: $e');
+      debugPrint('❌ Error playing song at $index: $e');
     }
   }
 
