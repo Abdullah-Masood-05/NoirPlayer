@@ -34,10 +34,31 @@ class _ArtistsTabState extends State<ArtistsTab> {
     return null;
   }
 
+  Widget _artistPlaceholder(ThemeData theme) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            theme.colorScheme.primary.withValues(alpha: 0.35),
+            theme.colorScheme.primary.withValues(alpha: 0.12),
+          ],
+        ),
+      ),
+      child: Center(
+        child: Icon(
+          Icons.person_rounded,
+          size: 80,
+          color: theme.colorScheme.primary.withValues(alpha: 0.6),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     if (!_permissionGranted) {
       return Center(
@@ -134,59 +155,9 @@ class _ArtistsTabState extends State<ArtistsTab> {
                                   id: song.id,
                                   type: ArtworkType.AUDIO,
                                   artworkFit: BoxFit.cover,
-                                  nullArtworkWidget: Container(
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors: isDark
-                                            ? [
-                                                Colors.grey[850]!,
-                                                Colors.grey[900]!,
-                                              ]
-                                            : [
-                                                Colors.grey[300]!,
-                                                Colors.grey[400]!,
-                                              ],
-                                      ),
-                                    ),
-                                    child: Center(
-                                      child: Icon(
-                                        Icons.person_rounded,
-                                        size: 80,
-                                        color: isDark
-                                            ? Colors.white24
-                                            : Colors.black26,
-                                      ),
-                                    ),
-                                  ),
+                                  nullArtworkWidget: _artistPlaceholder(theme),
                                 )
-                              : Container(
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                      colors: isDark
-                                          ? [
-                                              Colors.grey[850]!,
-                                              Colors.grey[900]!,
-                                            ]
-                                          : [
-                                              Colors.grey[300]!,
-                                              Colors.grey[400]!,
-                                            ],
-                                    ),
-                                  ),
-                                  child: Center(
-                                    child: Icon(
-                                      Icons.person_rounded,
-                                      size: 80,
-                                      color: isDark
-                                          ? Colors.white24
-                                          : Colors.black26,
-                                    ),
-                                  ),
-                                ),
+                              : _artistPlaceholder(theme),
                           Positioned(
                             bottom: 0,
                             left: 0,

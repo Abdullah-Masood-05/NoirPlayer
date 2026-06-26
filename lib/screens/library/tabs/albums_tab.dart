@@ -28,7 +28,6 @@ class _AlbumsTabState extends State<AlbumsTab> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     if (!_permissionGranted) {
       return Center(
@@ -125,16 +124,19 @@ class _AlbumsTabState extends State<AlbumsTab> {
                             gradient: LinearGradient(
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
-                              colors: isDark
-                                  ? [Colors.grey[850]!, Colors.grey[900]!]
-                                  : [Colors.grey[300]!, Colors.grey[400]!],
+                              colors: [
+                                theme.colorScheme.primary.withValues(alpha: 0.35),
+                                theme.colorScheme.primary.withValues(alpha: 0.12),
+                              ],
                             ),
                           ),
                           child: Center(
                             child: Icon(
                               Icons.album_rounded,
                               size: 80,
-                              color: isDark ? Colors.white24 : Colors.black26,
+                              color: theme.colorScheme.primary.withValues(
+                                alpha: 0.6,
+                              ),
                             ),
                           ),
                         ),

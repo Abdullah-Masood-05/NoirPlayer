@@ -354,9 +354,21 @@ class _SongsTabState extends State<SongsTab> {
           (song.artist ?? '').toLowerCase().contains(lowerSearch);
     }).toList();
 
-    return Column(
-      children: [
-        // Search bar
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            theme.colorScheme.primary.withValues(alpha: 0.10),
+            theme.scaffoldBackgroundColor,
+          ],
+          stops: const [0.0, 0.3],
+        ),
+      ),
+      child: Column(
+        children: [
+          // Search bar
         Padding(
           padding: const EdgeInsets.all(12.0),
           child: Container(
@@ -537,15 +549,13 @@ class _SongsTabState extends State<SongsTab> {
                                               artworkBorder:
                                                   BorderRadius.circular(12),
                                               nullArtworkWidget: Container(
-                                                color: isDark
-                                                    ? Colors.grey[850]
-                                                    : Colors.grey[300],
+                                                color: theme.colorScheme.primary
+                                                    .withValues(alpha: 0.12),
                                                 child: Icon(
                                                   Icons.music_note,
                                                   size: 28,
-                                                  color: isDark
-                                                      ? Colors.white38
-                                                      : Colors.black38,
+                                                  color:
+                                                      theme.colorScheme.primary,
                                                 ),
                                               ),
                                             ),
@@ -687,6 +697,7 @@ class _SongsTabState extends State<SongsTab> {
                     ),
         ),
       ],
+      ),
     );
   }
 
