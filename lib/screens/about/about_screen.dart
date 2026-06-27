@@ -5,7 +5,7 @@ import '../../core/theme/app_theme.dart';
 class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
 
-  static const String _version = '1.1.1';
+  static const String _version = '1.1.2';
 
   static const List<(IconData, String)> _features = [
     (Icons.library_music, 'Local library with a dedicated Music‑folder tab'),

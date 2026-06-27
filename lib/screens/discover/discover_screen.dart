@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/models/discovered_track.dart';
 import '../../core/services/audio_handler.dart';
 import '../../core/services/music_discovery_service.dart';
+import '../../core/services/settings_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../widgets/now_playing_indicator.dart';
 
@@ -141,7 +142,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
     switch (result) {
       case DownloadResult.success:
-        _showSnack('${track.name} downloaded successfully');
+        _showSnack(
+          'Saved to ${SettingsService.instance.musicFolderLabel}: ${track.name}',
+        );
         break;
       case DownloadResult.alreadyExists:
         _showSnack('${track.name} is already downloaded');
@@ -151,6 +154,12 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         break;
       case DownloadResult.failed:
         _showSnack('Failed to download ${track.name}');
+        break;
+      case DownloadResult.permissionDenied:
+        _showSnack(
+          'Storage access needed — allow "All files access" for Noir Player, '
+          'then try again',
+        );
         break;
       case DownloadResult.inProgress:
         break;

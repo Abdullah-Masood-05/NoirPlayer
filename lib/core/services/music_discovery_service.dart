@@ -7,12 +7,20 @@ import 'package:dio/dio.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:media_store_plus/media_store_plus.dart';
+import 'package:on_audio_query/on_audio_query.dart' show OnAudioQuery;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/discovered_track.dart';
+import 'settings_service.dart';
 
 /// Outcome of a download attempt.
-enum DownloadResult { success, alreadyExists, inProgress, noSource, failed }
+enum DownloadResult {
+  success,
+  alreadyExists,
+  inProgress,
+  noSource,
+  failed,
+  permissionDenied,
+}
 
 class MusicDiscoveryService {
   static final MusicDiscoveryService _instance =
@@ -25,7 +33,9 @@ class MusicDiscoveryService {
   final String youtubeApiKey = dotenv.env['YOUTUBE_API_KEY'] ?? '';
   final String rapidApiKey = dotenv.env['RAPIDAPI_KEY'] ?? '';
 
-  static bool mediaStoreInitialized = false;
+  /// Used to register freshly downloaded files with the media library so they
+  /// appear in the Library/Music tab (and other apps) immediately.
+  final OnAudioQuery _audioQuery = OnAudioQuery();
 
   static const String _downloadedPrefsKey = 'downloaded_track_keys';
 
@@ -262,6 +272,12 @@ class MusicDiscoveryService {
     if (!_inProgressKeys.add(key)) return DownloadResult.inProgress;
 
     try {
+      // We write straight into the public Music folder, which needs storage
+      // access. Fail fast (before hitting the network) if it isn't granted.
+      if (!await _ensureWritePermission()) {
+        return DownloadResult.permissionDenied;
+      }
+
       final videoId = await fetchYoutubeVideoId(track.name, track.artist);
       if (videoId.isEmpty) return DownloadResult.noSource;
 
@@ -285,43 +301,75 @@ class MusicDiscoveryService {
     }
   }
 
-  /// Request storage permission (only relevant on older Android versions;
-  /// MediaStore writes on Android 10+ do not need it).
-  Future<bool> requestStoragePermission() async {
-    final status = await Permission.storage.request();
-    return status.isGranted;
+  /// Ensure we can write into the public Music folder.
+  ///
+  /// Android 11+ requires "All files access" (MANAGE_EXTERNAL_STORAGE) to write
+  /// to shared directories with `dart:io`; older versions use the legacy
+  /// storage permission. Requesting `manageExternalStorage` opens the system
+  /// "All files access" screen.
+  Future<bool> _ensureWritePermission() async {
+    if (await Permission.manageExternalStorage.isGranted) return true;
+    // Legacy storage permission covers Android 10 and below.
+    if (await Permission.storage.request().isGranted) return true;
+    // Android 11+: prompt for all-files access.
+    return await Permission.manageExternalStorage.request().isGranted;
   }
 
-  /// Initialize MediaStore once.
-  Future<void> initMediaStore() async {
-    if (!mediaStoreInitialized) {
-      await MediaStore.ensureInitialized();
-      mediaStoreInitialized = true;
-    }
+  /// Resolve the folder downloads are saved into: the user-selected music
+  /// folder if set, otherwise the device's default public Music directory.
+  Future<String> downloadDirectory() async {
+    final custom = SettingsService.instance.musicFolderPath;
+    if (custom != null && custom.trim().isNotEmpty) return custom;
+    return _defaultMusicDirectory();
   }
 
-  /// Download an MP3 from [url] and save it to the device's Music library.
+  /// The device's public Music directory (e.g. /storage/emulated/0/Music),
+  /// derived from the external storage root so it works across devices.
+  Future<String> _defaultMusicDirectory() async {
+    try {
+      final ext = await getExternalStorageDirectory();
+      if (ext != null) {
+        // .../Android/data/<pkg>/files -> storage root
+        final root = ext.path.split('/Android/').first;
+        if (root.isNotEmpty) return '$root/Music';
+      }
+    } catch (_) {}
+    return '/storage/emulated/0/Music';
+  }
+
+  /// Download an MP3 from [url] straight into the music folder and register it
+  /// with the media library. Returns the saved file path, or null on failure.
   Future<String?> saveFile(
     String url,
     String rawFilename, {
     Function(int received, int total)? onProgress,
   }) async {
-    String? tempFilePath;
     try {
-      await initMediaStore();
-      MediaStore.appFolder = 'NoirPlayerDownloads';
-
       var filename = _sanitizeFileName(rawFilename);
       if (!filename.toLowerCase().endsWith('.mp3')) {
         filename = '$filename.mp3';
       }
 
-      final tempDir = await getTemporaryDirectory();
-      tempFilePath = '${tempDir.path}/$filename';
+      final folder = await downloadDirectory();
+      final dir = Directory(folder);
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+
+      // Avoid clobbering an existing file with the same name.
+      var filePath = '$folder/$filename';
+      if (await File(filePath).exists()) {
+        final base = filename.substring(0, filename.length - 4); // strip .mp3
+        var n = 1;
+        do {
+          filePath = '$folder/$base ($n).mp3';
+          n++;
+        } while (await File(filePath).exists());
+      }
 
       await Dio().download(
         url,
-        tempFilePath,
+        filePath,
         options: Options(
           followRedirects: true,
           // Only accept successful responses; otherwise an error page would be
@@ -333,31 +381,17 @@ class MusicDiscoveryService {
             onProgress?.call(received, total),
       );
 
-      final mediaStore = MediaStore();
-      final savedInfo = await mediaStore.saveFile(
-        tempFilePath: tempFilePath,
-        dirType: DirType.audio,
-        dirName: DirName.music,
-        relativePath: null,
-      );
-
-      if (savedInfo == null) {
-        _logError('Failed to save file');
-        return null;
+      // Make the new file visible in the media library straight away.
+      try {
+        await _audioQuery.scanMedia(filePath);
+      } catch (e) {
+        _logError('Media scan failed for $filePath: $e');
       }
 
-      return savedInfo.uri.toString();
+      return filePath;
     } catch (e) {
       _logError('Error saving file: $e');
       return null;
-    } finally {
-      // Clean up the temp file so the cache does not grow unbounded.
-      if (tempFilePath != null) {
-        try {
-          final f = File(tempFilePath);
-          if (await f.exists()) await f.delete();
-        } catch (_) {}
-      }
     }
   }
 

@@ -61,8 +61,10 @@ class SettingsScreen extends StatelessWidget {
               _SectionHeader('Library'),
               ListTile(
                 leading: const Icon(Icons.folder_outlined),
-                title: const Text('Music folder'),
-                subtitle: Text(settings.musicFolderLabel),
+                title: const Text('Music & download folder'),
+                subtitle: Text(
+                  '${settings.musicFolderLabel} • new downloads are saved here',
+                ),
                 onTap: () => _pickMusicFolder(context, settings),
               ),
               const Divider(height: 1),
