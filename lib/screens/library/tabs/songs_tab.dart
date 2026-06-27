@@ -24,10 +24,16 @@ class SongsTab extends StatefulWidget {
   State<SongsTab> createState() => _SongsTabState();
 }
 
-class _SongsTabState extends State<SongsTab> {
+class _SongsTabState extends State<SongsTab>
+    with AutomaticKeepAliveClientMixin {
   final OnAudioQuery _audioQuery = OnAudioQuery();
   List<SongModel> _songs = [];
   String _searchText = '';
+
+  // Keep the tab alive so switching tabs doesn't dispose it and re-query the
+  // whole library every time (which was the source of the tab-switch lag).
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -214,7 +220,7 @@ class _SongsTabState extends State<SongsTab> {
                   ],
                 ),
               ),
-              
+
               // Playlist list
               ConstrainedBox(
                 constraints: const BoxConstraints(maxHeight: 300),
@@ -222,10 +228,10 @@ class _SongsTabState extends State<SongsTab> {
                   shrinkWrap: true,
                   itemCount: PlaylistService.instance.playlists.length,
                   itemBuilder: (context, index) {
-                    final playlist =
-                        PlaylistService.instance.playlists[index];
-                    final alreadyAdded =
-                        playlist.songs.any((s) => s.id == song.id);
+                    final playlist = PlaylistService.instance.playlists[index];
+                    final alreadyAdded = playlist.songs.any(
+                      (s) => s.id == song.id,
+                    );
 
                     return Material(
                       color: Colors.transparent,
@@ -281,8 +287,9 @@ class _SongsTabState extends State<SongsTab> {
                                 decoration: BoxDecoration(
                                   color: alreadyAdded
                                       ? Colors.grey.withValues(alpha: 0.2)
-                                      : theme.colorScheme.primary
-                                          .withValues(alpha: 0.1),
+                                      : theme.colorScheme.primary.withValues(
+                                          alpha: 0.1,
+                                        ),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Icon(
@@ -291,8 +298,8 @@ class _SongsTabState extends State<SongsTab> {
                                       : Icons.playlist_play,
                                   color: alreadyAdded
                                       ? (isDark
-                                          ? Colors.white38
-                                          : Colors.black38)
+                                            ? Colors.white38
+                                            : Colors.black38)
                                       : theme.colorScheme.primary,
                                   size: 20,
                                 ),
@@ -309,8 +316,11 @@ class _SongsTabState extends State<SongsTab> {
                                         fontWeight: FontWeight.w600,
                                         color: alreadyAdded
                                             ? theme.textTheme.bodyMedium?.color
-                                                ?.withValues(alpha: 0.5)
-                                            : theme.textTheme.titleMedium?.color,
+                                                  ?.withValues(alpha: 0.5)
+                                            : theme
+                                                  .textTheme
+                                                  .titleMedium
+                                                  ?.color,
                                       ),
                                     ),
                                     const SizedBox(height: 2),
@@ -339,7 +349,7 @@ class _SongsTabState extends State<SongsTab> {
                   },
                 ),
               ),
-              
+
               // Cancel button
               Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -377,6 +387,7 @@ class _SongsTabState extends State<SongsTab> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // required by AutomaticKeepAliveClientMixin
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
@@ -406,13 +417,13 @@ class _SongsTabState extends State<SongsTab> {
               ],
             ),
             child: TextField(
-              style: TextStyle(
-                color: theme.textTheme.bodyLarge?.color,
-              ),
+              style: TextStyle(color: theme.textTheme.bodyLarge?.color),
               decoration: InputDecoration(
                 hintText: 'Search songs or artists...',
                 hintStyle: TextStyle(
-                  color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.5),
+                  color: theme.textTheme.bodyMedium?.color?.withValues(
+                    alpha: 0.5,
+                  ),
                 ),
                 prefixIcon: Icon(
                   Icons.search,
@@ -437,7 +448,7 @@ class _SongsTabState extends State<SongsTab> {
             ),
           ),
         ),
-        
+
         // Songs list
         Expanded(
           child: _songs.isEmpty
@@ -457,264 +468,268 @@ class _SongsTabState extends State<SongsTab> {
                   ),
                 )
               : filteredSongs.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.search_off,
-                            size: 64,
-                            color: theme.iconTheme.color?.withValues(alpha: 0.3),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No songs found',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: theme.textTheme.titleMedium?.color,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Try a different search term',
-                            style: TextStyle(
-                              color: theme.textTheme.bodyMedium?.color
-                                  ?.withValues(alpha: 0.7),
-                            ),
-                          ),
-                        ],
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.search_off,
+                        size: 64,
+                        color: theme.iconTheme.color?.withValues(alpha: 0.3),
                       ),
-                    )
-                  : RefreshIndicator(
-                      color: theme.colorScheme.primary,
-                      onRefresh: _loadSongs,
-                      child: ListView.builder(
-                        physics: const BouncingScrollPhysics(
-                          parent: AlwaysScrollableScrollPhysics(),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No songs found',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: theme.textTheme.titleMedium?.color,
                         ),
-                        cacheExtent: 500,
-                        itemCount: filteredSongs.length,
-                        itemBuilder: (context, index) {
-                          final song = filteredSongs[index];
-                          
-                          return TweenAnimationBuilder<double>(
-                            duration: Duration(
-                              milliseconds: 200 + (index % 10) * 30,
-                            ),
-                            tween: Tween(begin: 0.0, end: 1.0),
-                            curve: Curves.easeOut,
-                            builder: (context, value, child) {
-                              return Opacity(
-                                opacity: value,
-                                child: Transform.translate(
-                                  offset: Offset(0, 20 * (1 - value)),
-                                  child: child,
-                                ),
-                              );
-                            },
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                splashColor:
-                                    theme.colorScheme.primary.withValues(alpha: 0.1),
-                                highlightColor:
-                                    theme.colorScheme.primary.withValues(alpha: 0.05),
-                                onTap: () => _playSongAndNavigate(song, context),
-                                onLongPress: () => _addSongToPlaylist(song),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 10,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    border: Border(
-                                      bottom: BorderSide(
-                                        color: isDark
-                                            ? Colors.white.withValues(alpha: 0.05)
-                                            : Colors.black.withValues(alpha: 0.03),
-                                        width: 0.5,
-                                      ),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      // Artwork
-                                      Hero(
-                                        tag: 'song_art_${song.id}',
-                                        child: Container(
-                                          width: 56,
-                                          height: 56,
-                                          decoration: BoxDecoration(
-                                            borderRadius:
-                                                BorderRadius.circular(12),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: isDark
-                                                    ? Colors.black
-                                                        .withValues(alpha: 0.3)
-                                                    : Colors.grey
-                                                        .withValues(alpha: 0.2),
-                                                blurRadius: 4,
-                                                offset: const Offset(0, 2),
-                                              ),
-                                            ],
-                                          ),
-                                          child: ClipRRect(
-                                            borderRadius:
-                                                BorderRadius.circular(12),
-                                            child: QueryArtworkWidget(
-                                              id: song.id,
-                                              type: ArtworkType.AUDIO,
-                                              artworkBorder:
-                                                  BorderRadius.circular(12),
-                                              nullArtworkWidget: Container(
-                                                color: theme.colorScheme.primary
-                                                    .withValues(alpha: 0.12),
-                                                child: Icon(
-                                                  Icons.music_note,
-                                                  size: 28,
-                                                  color:
-                                                      theme.colorScheme.primary,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 14),
-                                      
-                                      // Song info
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              song.title,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                fontSize: 15,
-                                                fontWeight: FontWeight.w600,
-                                                color: theme
-                                                    .textTheme.titleMedium?.color,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              song.artist ?? "Unknown Artist",
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                fontSize: 13,
-                                                color: theme
-                                                    .textTheme.bodyMedium?.color
-                                                    ?.withValues(alpha: 0.7),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      
-                                      // Favourite toggle
-                                      ListenableBuilder(
-                                        listenable: PlaylistService.instance,
-                                        builder: (context, _) {
-                                          final fav = PlaylistService.instance
-                                              .isFavourite(song.id);
-                                          return IconButton(
-                                            visualDensity: VisualDensity.compact,
-                                            tooltip: fav
-                                                ? 'Remove from Favourites'
-                                                : 'Add to Favourites',
-                                            icon: Icon(
-                                              fav
-                                                  ? Icons.favorite
-                                                  : Icons.favorite_border,
-                                              size: 22,
-                                              color: fav
-                                                  ? theme.colorScheme.primary
-                                                  : theme.iconTheme.color
-                                                        ?.withValues(alpha: 0.55),
-                                            ),
-                                            onPressed: () => PlaylistService
-                                                .instance
-                                                .toggleFavourite(
-                                                  PlaylistSong(
-                                                    id: song.id,
-                                                    title: song.title,
-                                                    artist: song.artist ??
-                                                        'Unknown Artist',
-                                                    data: song.data,
-                                                    duration: song.duration,
-                                                  ),
-                                                ),
-                                          );
-                                        },
-                                      ),
-                                      // Now-playing indicator for the current
-                                      // track, otherwise the duration chip.
-                                      StreamBuilder<MediaItem?>(
-                                        stream: audioHandler.mediaItem,
-                                        builder: (context, snap) {
-                                          final isCurrent =
-                                              snap.data?.id ==
-                                              song.id.toString();
-                                          if (isCurrent) {
-                                            return Padding(
-                                              padding: const EdgeInsets.symmetric(
-                                                horizontal: 8,
-                                              ),
-                                              child: NowPlayingIndicator(
-                                                color: theme.colorScheme.primary,
-                                                size: 18,
-                                              ),
-                                            );
-                                          }
-                                          return Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 10,
-                                              vertical: 6,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: isDark
-                                                  ? Colors.white.withValues(
-                                                      alpha: 0.05,
-                                                    )
-                                                  : Colors.black.withValues(
-                                                      alpha: 0.03,
-                                                    ),
-                                              borderRadius: BorderRadius.circular(
-                                                8,
-                                              ),
-                                            ),
-                                            child: Text(
-                                              _formatDuration(
-                                                song.duration ?? 0,
-                                              ),
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w500,
-                                                color: theme
-                                                    .textTheme
-                                                    .bodySmall
-                                                    ?.color
-                                                    ?.withValues(alpha: 0.8),
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Try a different search term',
+                        style: TextStyle(
+                          color: theme.textTheme.bodyMedium?.color?.withValues(
+                            alpha: 0.7,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  color: theme.colorScheme.primary,
+                  onRefresh: _loadSongs,
+                  child: ListView.builder(
+                    physics: const BouncingScrollPhysics(
+                      parent: AlwaysScrollableScrollPhysics(),
+                    ),
+                    cacheExtent: 500,
+                    itemCount: filteredSongs.length,
+                    itemBuilder: (context, index) {
+                      final song = filteredSongs[index];
+
+                      return TweenAnimationBuilder<double>(
+                        duration: Duration(
+                          milliseconds: 200 + (index % 10) * 30,
+                        ),
+                        tween: Tween(begin: 0.0, end: 1.0),
+                        curve: Curves.easeOut,
+                        builder: (context, value, child) {
+                          return Opacity(
+                            opacity: value,
+                            child: Transform.translate(
+                              offset: Offset(0, 20 * (1 - value)),
+                              child: child,
                             ),
                           );
                         },
-                      ),
-                    ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            splashColor: theme.colorScheme.primary.withValues(
+                              alpha: 0.1,
+                            ),
+                            highlightColor: theme.colorScheme.primary
+                                .withValues(alpha: 0.05),
+                            onTap: () => _playSongAndNavigate(song, context),
+                            onLongPress: () => _addSongToPlaylist(song),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 10,
+                              ),
+                              decoration: BoxDecoration(
+                                border: Border(
+                                  bottom: BorderSide(
+                                    color: isDark
+                                        ? Colors.white.withValues(alpha: 0.05)
+                                        : Colors.black.withValues(alpha: 0.03),
+                                    width: 0.5,
+                                  ),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  // Artwork
+                                  Hero(
+                                    tag: 'song_art_${song.id}',
+                                    child: Container(
+                                      width: 56,
+                                      height: 56,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(12),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: isDark
+                                                ? Colors.black.withValues(
+                                                    alpha: 0.3,
+                                                  )
+                                                : Colors.grey.withValues(
+                                                    alpha: 0.2,
+                                                  ),
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: QueryArtworkWidget(
+                                          id: song.id,
+                                          type: ArtworkType.AUDIO,
+                                          artworkBorder: BorderRadius.circular(
+                                            12,
+                                          ),
+                                          nullArtworkWidget: Container(
+                                            color: theme.colorScheme.primary
+                                                .withValues(alpha: 0.12),
+                                            child: Icon(
+                                              Icons.music_note,
+                                              size: 28,
+                                              color: theme.colorScheme.primary,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 14),
+
+                                  // Song info
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          song.title,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w600,
+                                            color: theme
+                                                .textTheme
+                                                .titleMedium
+                                                ?.color,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          song.artist ?? "Unknown Artist",
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: theme
+                                                .textTheme
+                                                .bodyMedium
+                                                ?.color
+                                                ?.withValues(alpha: 0.7),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  // Favourite toggle
+                                  ListenableBuilder(
+                                    listenable: PlaylistService.instance,
+                                    builder: (context, _) {
+                                      final fav = PlaylistService.instance
+                                          .isFavourite(song.id);
+                                      return IconButton(
+                                        visualDensity: VisualDensity.compact,
+                                        tooltip: fav
+                                            ? 'Remove from Favourites'
+                                            : 'Add to Favourites',
+                                        icon: Icon(
+                                          fav
+                                              ? Icons.favorite
+                                              : Icons.favorite_border,
+                                          size: 22,
+                                          color: fav
+                                              ? theme.colorScheme.primary
+                                              : theme.iconTheme.color
+                                                    ?.withValues(alpha: 0.55),
+                                        ),
+                                        onPressed: () => PlaylistService
+                                            .instance
+                                            .toggleFavourite(
+                                              PlaylistSong(
+                                                id: song.id,
+                                                title: song.title,
+                                                artist:
+                                                    song.artist ??
+                                                    'Unknown Artist',
+                                                data: song.data,
+                                                duration: song.duration,
+                                              ),
+                                            ),
+                                      );
+                                    },
+                                  ),
+                                  // Now-playing indicator for the current
+                                  // track, otherwise the duration chip.
+                                  StreamBuilder<MediaItem?>(
+                                    stream: audioHandler.mediaItem,
+                                    builder: (context, snap) {
+                                      final isCurrent =
+                                          snap.data?.id == song.id.toString();
+                                      if (isCurrent) {
+                                        return Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                          ),
+                                          child: NowPlayingIndicator(
+                                            color: theme.colorScheme.primary,
+                                            size: 18,
+                                          ),
+                                        );
+                                      }
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: isDark
+                                              ? Colors.white.withValues(
+                                                  alpha: 0.05,
+                                                )
+                                              : Colors.black.withValues(
+                                                  alpha: 0.03,
+                                                ),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          _formatDuration(song.duration ?? 0),
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                            color: theme
+                                                .textTheme
+                                                .bodySmall
+                                                ?.color
+                                                ?.withValues(alpha: 0.8),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
         ),
       ],
     );

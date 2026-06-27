@@ -84,110 +84,118 @@ class _HomeScreenState extends State<HomeScreen>
     // Every tab floats its content up behind a transparent app bar over a
     // subtle gradient (the player's immersive look), for one cohesive top area.
     final isPlayer = _selectedIndex == 1;
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        title: Text(_titles[_selectedIndex]),
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        scrolledUnderElevation: 0,
-        actions: isPlayer
-            ? [
-                ListenableBuilder(
-                  listenable: SettingsService.instance,
-                  builder: (context, _) => TextButton(
-                    onPressed: () => showPlaybackSpeedSheet(context),
-                    child: Text(
-                      formatSpeed(SettingsService.instance.playbackSpeed),
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontWeight: FontWeight.bold,
+    return PopScope(
+      // Back returns to the Library tab first; only exits the app from Library.
+      canPop: _selectedIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _onItemTapped(0);
+      },
+      child: Scaffold(
+        extendBodyBehindAppBar: true,
+        appBar: AppBar(
+          title: Text(_titles[_selectedIndex]),
+          centerTitle: true,
+          backgroundColor: Colors.transparent,
+          scrolledUnderElevation: 0,
+          actions: isPlayer
+              ? [
+                  ListenableBuilder(
+                    listenable: SettingsService.instance,
+                    builder: (context, _) => TextButton(
+                      onPressed: () => showPlaybackSpeedSheet(context),
+                      child: Text(
+                        formatSpeed(SettingsService.instance.playbackSpeed),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                IconButton(
-                  tooltip: 'Sleep timer',
-                  icon: const Icon(Icons.bedtime_outlined),
-                  onPressed: () => showSleepTimerSheet(context),
-                ),
-              ]
-            : null,
-      ),
-      drawer: _buildDrawer(context),
-      body: Column(
-        children: [
-          Expanded(
-            child: AnimatedBuilder(
-              animation: _transition,
-              builder: (context, child) {
-                final t = Curves.easeOut.transform(_transition.value);
-                if (_selectedIndex == 1) {
-                  // Player tab: a distinct zoom + fade.
+                  IconButton(
+                    tooltip: 'Sleep timer',
+                    icon: const Icon(Icons.bedtime_outlined),
+                    onPressed: () => showSleepTimerSheet(context),
+                  ),
+                ]
+              : null,
+        ),
+        drawer: _buildDrawer(context),
+        body: Column(
+          children: [
+            Expanded(
+              child: AnimatedBuilder(
+                animation: _transition,
+                builder: (context, child) {
+                  final t = Curves.easeOut.transform(_transition.value);
+                  if (_selectedIndex == 1) {
+                    // Player tab: a distinct zoom + fade.
+                    return Opacity(
+                      opacity: t,
+                      child: Transform.scale(
+                        scale: 0.92 + 0.08 * t,
+                        child: child,
+                      ),
+                    );
+                  }
+                  // Other tabs: fade + a gentle horizontal slide.
                   return Opacity(
                     opacity: t,
-                    child: Transform.scale(
-                      scale: 0.92 + 0.08 * t,
+                    child: Transform.translate(
+                      offset: Offset((1 - t) * 28, 0),
                       child: child,
                     ),
                   );
-                }
-                // Other tabs: fade + a gentle horizontal slide.
-                return Opacity(
-                  opacity: t,
-                  child: Transform.translate(
-                    offset: Offset((1 - t) * 28, 0),
-                    child: child,
+                },
+                child: IndexedStack(
+                  index: _selectedIndex,
+                  children: List.generate(
+                    _titles.length,
+                    (i) => _visited.contains(i)
+                        ? _buildScreen(i)
+                        : const SizedBox.shrink(),
                   ),
-                );
-              },
-              child: IndexedStack(
-                index: _selectedIndex,
-                children: List.generate(
-                  _titles.length,
-                  (i) => _visited.contains(i)
-                      ? _buildScreen(i)
-                      : const SizedBox.shrink(),
                 ),
               ),
             ),
-          ),
-          // Mini-player above the nav bar (hidden on the Player tab and when
-          // nothing is loaded).
-          AnimatedSize(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOut,
-            child: _selectedIndex == 1
-                ? const SizedBox.shrink()
-                : MiniPlayer(onTap: () => _onItemTapped(1)),
-          ),
-        ],
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: _onItemTapped,
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.library_music_outlined),
-            selectedIcon: Icon(Icons.library_music),
-            label: 'Library',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.music_note_outlined),
-            selectedIcon: Icon(Icons.music_note),
-            label: 'Player',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.playlist_play_outlined),
-            selectedIcon: Icon(Icons.playlist_play),
-            label: 'Playlists',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.explore_outlined),
-            selectedIcon: Icon(Icons.explore),
-            label: 'Discover',
-          ),
-        ],
+            // Mini-player above the nav bar (hidden on the Player tab and when
+            // nothing is loaded).
+            AnimatedSize(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOut,
+              child: _selectedIndex == 1
+                  ? const SizedBox.shrink()
+                  : MiniPlayer(onTap: () => _onItemTapped(1)),
+            ),
+          ],
+        ),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: _selectedIndex,
+          onDestinationSelected: _onItemTapped,
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.library_music_outlined),
+              selectedIcon: Icon(Icons.library_music),
+              label: 'Library',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.music_note_outlined),
+              selectedIcon: Icon(Icons.music_note),
+              label: 'Player',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.playlist_play_outlined),
+              selectedIcon: Icon(Icons.playlist_play),
+              label: 'Playlists',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.explore_outlined),
+              selectedIcon: Icon(Icons.explore),
+              label: 'Discover',
+            ),
+          ],
+        ),
       ),
     );
   }

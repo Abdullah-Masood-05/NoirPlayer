@@ -10,12 +10,18 @@ class ArtistsTab extends StatefulWidget {
   State<ArtistsTab> createState() => _ArtistsTabState();
 }
 
-class _ArtistsTabState extends State<ArtistsTab> {
+class _ArtistsTabState extends State<ArtistsTab>
+    with AutomaticKeepAliveClientMixin {
   final OnAudioQuery _audioQuery = OnAudioQuery();
   bool _permissionGranted = false;
   // Cache queries so tab switches don't re-run them (which caused lag).
   Future<List<ArtistModel>>? _artistsFuture;
   final Map<int, Future<SongModel?>> _firstSongFutures = {};
+
+  // Keep the tab alive so switching away doesn't dispose it (and its cached
+  // queries), which would force a re-query on return.
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -61,6 +67,7 @@ class _ArtistsTabState extends State<ArtistsTab> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // required by AutomaticKeepAliveClientMixin
     final theme = Theme.of(context);
 
     if (!_permissionGranted) {
@@ -122,8 +129,9 @@ class _ArtistsTabState extends State<ArtistsTab> {
                 );
               },
               child: FutureBuilder<SongModel?>(
-                future: _firstSongFutures[artist.id] ??=
-                    _getFirstSongOfArtist(artist.id),
+                future: _firstSongFutures[artist.id] ??= _getFirstSongOfArtist(
+                  artist.id,
+                ),
                 builder: (context, songSnapshot) {
                   final song = songSnapshot.data;
 
@@ -204,7 +212,9 @@ class _ArtistsTabState extends State<ArtistsTab> {
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: Colors.white.withValues(alpha: 0.8),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.8,
+                                      ),
                                     ),
                                   ),
                                 ],

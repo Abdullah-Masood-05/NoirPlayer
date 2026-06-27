@@ -10,11 +10,17 @@ class AlbumsTab extends StatefulWidget {
   State<AlbumsTab> createState() => _AlbumsTabState();
 }
 
-class _AlbumsTabState extends State<AlbumsTab> {
+class _AlbumsTabState extends State<AlbumsTab>
+    with AutomaticKeepAliveClientMixin {
   final OnAudioQuery _audioQuery = OnAudioQuery();
   bool _permissionGranted = false;
   // Query once and reuse, so tab switches don't re-run it (which caused lag).
   Future<List<AlbumModel>>? _albumsFuture;
+
+  // Keep the tab alive so switching away doesn't dispose it (and its cached
+  // query), which would force a re-query on return.
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -29,6 +35,7 @@ class _AlbumsTabState extends State<AlbumsTab> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // required by AutomaticKeepAliveClientMixin
     final theme = Theme.of(context);
 
     if (!_permissionGranted) {
@@ -74,7 +81,7 @@ class _AlbumsTabState extends State<AlbumsTab> {
             crossAxisCount: 2,
             mainAxisSpacing: 16,
             crossAxisSpacing: 16,
-            childAspectRatio: 0.75, 
+            childAspectRatio: 0.75,
           ),
           itemCount: albums.length,
           itemBuilder: (context, index) {
@@ -127,8 +134,12 @@ class _AlbumsTabState extends State<AlbumsTab> {
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                               colors: [
-                                theme.colorScheme.primary.withValues(alpha: 0.35),
-                                theme.colorScheme.primary.withValues(alpha: 0.12),
+                                theme.colorScheme.primary.withValues(
+                                  alpha: 0.35,
+                                ),
+                                theme.colorScheme.primary.withValues(
+                                  alpha: 0.12,
+                                ),
                               ],
                             ),
                           ),
