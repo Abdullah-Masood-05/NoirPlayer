@@ -288,6 +288,8 @@ class MusicDiscoveryService {
   /// Request storage permission (only relevant on older Android versions;
   /// MediaStore writes on Android 10+ do not need it).
   Future<bool> requestStoragePermission() async {
+    // iOS has no external-storage permission — files live in the app sandbox.
+    if (Platform.isIOS) return true;
     final status = await Permission.storage.request();
     return status.isGranted;
   }
@@ -308,8 +310,11 @@ class MusicDiscoveryService {
   }) async {
     String? tempFilePath;
     try {
-      await initMediaStore();
-      MediaStore.appFolder = 'NoirPlayerDownloads';
+      // media_store_plus is Android-only — skip its init on iOS.
+      if (!Platform.isIOS) {
+        await initMediaStore();
+        MediaStore.appFolder = 'NoirPlayerDownloads';
+      }
 
       var filename = _sanitizeFileName(rawFilename);
       if (!filename.toLowerCase().endsWith('.mp3')) {
@@ -332,6 +337,20 @@ class MusicDiscoveryService {
         onReceiveProgress: (received, total) =>
             onProgress?.call(received, total),
       );
+
+      // media_store_plus is Android-only. On iOS, save the MP3 into the app's
+      // Documents folder instead (sandboxed — no permission needed).
+      if (Platform.isIOS) {
+        final docDir = await getApplicationDocumentsDirectory();
+        final destDir = Directory('${docDir.path}/NoirPlayerDownloads');
+        await destDir.create(recursive: true);
+        final destFile = File('${destDir.path}/$filename');
+        if (await destFile.exists()) {
+          await destFile.delete();
+        }
+        await File(tempFilePath).copy(destFile.path);
+        return destFile.path;
+      }
 
       final mediaStore = MediaStore();
       final savedInfo = await mediaStore.saveFile(
