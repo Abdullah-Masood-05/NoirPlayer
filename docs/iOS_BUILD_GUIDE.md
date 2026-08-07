@@ -133,7 +133,23 @@ secret is missing. Nothing is ever hardcoded in the repo.
 **Download the IPA:** open the workflow run → **Summary** → **Artifacts** →
 download `noir-player-ios-<sha>`.
 
-## 7. Does CI/CD only work on the `main` branch?
+## 7. Automatic GitHub Releases (iOS)
+
+Pushing a version tag automatically builds the IPA **and** publishes it to
+GitHub Releases once the build finishes:
+
+```bash
+git tag v1.1.2
+git push origin v1.1.2
+```
+
+The `publish-release` job only runs for tags matching `v*`, waits for
+`build-ios` to succeed, then attaches the IPA to a release named
+`Noir Player v1.1.2`. The release note automatically says whether the IPA is
+signed or unsigned. (Android releases are handled by your existing process —
+this only adds the iOS IPA.)
+
+## 8. Does CI/CD only work on the `main` branch?
 
 **No.** GitHub Actions runs the workflow file **from the branch that triggered
 it**, so a push to `feat/ios-cicd` runs the version of `ios.yml` on that
@@ -148,7 +164,7 @@ branch. There is one quirk:
 - Secrets are repo-level and available on every branch (except `pull_request`
   events from forks).
 
-## 8. Ported Android changes (your manifest / gradle work)
+## 9. Ported Android changes (your manifest / gradle work)
 
 The Gradle/Kotlin/AGP settings themselves are Android-only, but the intent of
 your manifest changes is mirrored in `ios/Runner/Info.plist`:
@@ -174,7 +190,7 @@ work (they were the blockers for "project will not run"):
    On iOS, downloads are written to the app's Documents folder instead of the
    MediaStore; `requestStoragePermission()` returns `true` on iOS.
 
-## 9. Troubleshooting
+## 10. Troubleshooting
 
 | Error | Fix |
 |---|---|

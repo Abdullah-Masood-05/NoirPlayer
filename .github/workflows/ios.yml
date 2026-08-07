@@ -20,6 +20,8 @@ on:
       - main
       - 'feat/**'
       - 'ci/**'
+    tags:
+      - 'v*'
   pull_request:
   workflow_dispatch:
     inputs:
@@ -52,6 +54,8 @@ jobs:
     name: Build iOS IPA
     runs-on: macos-latest
     timeout-minutes: 60
+    outputs:
+      signing_enabled: ${{ steps.mode.outputs.value }}
     env:
       # Signed when the manual input is on, OR the repo variable is 'true'.
       SIGNING_ENABLED: ${{ inputs.signing_enabled == true || vars.IOS_SIGNING_ENABLED == 'true' }}
@@ -72,6 +76,10 @@ jobs:
 
       - name: Verify Flutter
         run: flutter --version
+
+      - name: Set build mode (exposed to the release job)
+        id: mode
+        run: echo "value=${{ env.SIGNING_ENABLED }}" >> "$GITHUB_OUTPUT"
 
       - name: Create .env from GitHub Secrets (required build asset)
         run: bash ./.github/scripts/create_env.sh
@@ -210,3 +218,33 @@ jobs:
           path: |
             build/ios/**/*.ipa
             build/ios/iphoneos/Runner.app
+
+  # ---------------------------------------------------------------------- release
+  # Runs only when a version tag (e.g. v1.1.2) is pushed, and only after the
+  # build above has finished. Publishes the IPA to GitHub Releases.
+  publish-release:
+    name: Publish iOS GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build-ios
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      SIGNING_ENABLED: ${{ needs.build-ios.outputs.signing_enabled }}
+    steps:
+      - name: Download IPA artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: noir-player-ios-${{ github.sha }}
+          path: release
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Noir Player ${{ github.ref_name }}
+          body: |
+            ## iOS build for ${{ github.ref_name }}
+
+            ${{ env.SIGNING_ENABLED == 'true' && 'Signed IPA (export method from the workflow input).' || 'Unsigned IPA — use a sideloading tool (e.g. Sideloadly) to install it on a device.' }}
+          files: release/**/*.ipa
