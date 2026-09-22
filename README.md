@@ -13,10 +13,13 @@
   <a href="https://dart.dev"><img alt="Dart" src="https://img.shields.io/badge/Dart-3.9+-0175C2?logo=dart&logoColor=white"></a>
   <img alt="Platform" src="https://img.shields.io/badge/Platform-Android-3DDC84?logo=android&logoColor=white">
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/License-MIT-yellow.svg"></a>
+  <a href="https://github.com/Abdullah-Masood-05/noir-player-desktop-app"><img alt="Desktop" src="https://img.shields.io/badge/Desktop-Windows%20%7C%20macOS%20%7C%20Linux-E53935?logo=rust&logoColor=white"></a>
 </p>
 
 <p>
   <a href="https://github.com/Abdullah-Masood-05/NoirPlayer/releases/latest"><b>📥 Download the latest APK</b></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/Abdullah-Masood-05/noir-player-desktop-app/releases/latest"><b>🖥️ Get it for desktop</b></a>
 </p>
 
 </div>
@@ -28,6 +31,7 @@
 - [📦 Overview](#-overview)
 - [✨ Features](#-features)
 - [📥 Download](#-download)
+- [🖥️ Noir Player for Desktop](#️-noir-player-for-desktop)
 - [🖼️ Screens](#️-screens)
 - [📁 Project Structure](#-project-structure)
 - [🚀 Getting Started](#-getting-started)
@@ -53,6 +57,8 @@ Noir Player is a small, focused Flutter app that:
 4. **Discovers new music** — browse trending tracks and search by name via the **Last.fm** API.
 5. **Streams & downloads** — preview tracks and save them as MP3 to your device's music folder.
 6. **Tailors playback** — sleep timer, playback speed, resume‑after‑a‑call and more, all in a sectioned Settings page reached from the side drawer.
+
+> 🖥️ **On a computer?** [Noir Player for Desktop](https://github.com/Abdullah-Masood-05/noir-player-desktop-app) is the same player rebuilt in Rust for Windows, macOS and Linux.
 
 ---
 
@@ -84,6 +90,27 @@ Grab the latest signed APK from the **[Releases](https://github.com/Abdullah-Mas
 | v1.0.0 | Online discovery, downloads, media controls and full playback settings |
 | v0.2.0 | Firebase authentication (experimental, pre‑release) |
 | v0.1.0 | Initial local music player |
+
+---
+
+## 🖥️ Noir Player for Desktop
+
+Noir Player started here, on Android. The **[desktop edition](https://github.com/Abdullah-Masood-05/noir-player-desktop-app)** carries the
+same idea to the computer: a local library, the red‑on‑black look, and Discover — rebuilt
+from scratch in **Rust** with **GPUI Kit** rather than Flutter.
+
+| | 📱 Mobile (this repo) | 🖥️ [Desktop](https://github.com/Abdullah-Masood-05/noir-player-desktop-app) |
+|---|---|---|
+| **Built with** | Flutter · Dart | Rust · GPUI Kit |
+| **Runs on** | Android | Windows · macOS · Linux |
+| **Library** | Device audio via `on_audio_query` | Folder scanning, sorted A→Z under letter headings |
+| **Playback** | Background service, notification & lock‑screen controls | Desktop transport bar, click‑to‑seek, queue rail |
+| **Extras** | Sleep timer, playback speed | 5‑band equalizer, embedded lyrics, in‑app updates |
+| **Discover** | Last.fm search, YouTube → MP3 download | The same services, same keys |
+
+<p>
+  <a href="https://github.com/Abdullah-Masood-05/noir-player-desktop-app/releases/latest"><b>📥 Download for Windows, macOS or Linux</b></a>
+</p>
 
 ---
 
@@ -273,5 +300,7 @@ Distributed under the **MIT License**. See [LICENSE](LICENSE) for details.
 <div align="center">
 
 **🎧 Enjoy the music with Noir Player!**
+
+📱 Android · 🖥️ [Windows, macOS & Linux](https://github.com/Abdullah-Masood-05/noir-player-desktop-app)
 
 </div>
