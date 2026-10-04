@@ -104,7 +104,10 @@ class SettingsScreen extends StatelessWidget {
               SwitchListTile(
                 secondary: const Icon(Icons.swipe),
                 title: const Text('Stop on application swipe'),
-                subtitle: const Text('Stop playback when the app is dismissed'),
+                subtitle: const Text(
+                  'Stop music when the app is swiped away from recents. '
+                  'Off: it keeps playing in the notification',
+                ),
                 value: settings.stopOnAppSwipe,
                 onChanged: settings.setStopOnAppSwipe,
               ),
