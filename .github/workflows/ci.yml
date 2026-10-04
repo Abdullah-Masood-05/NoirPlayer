@@ -1,0 +1,168 @@
+# -----------------------------------------------------------------------------
+# Noir Player (Android) - continuous integration
+#
+# Runs on every branch push and pull request: pub get, analyze, test, then
+# builds the release APK and uploads it as a workflow artifact.
+# Also callable from release.yml (workflow_call) so tagged releases go through
+# exactly the same checks and reuse the APK built here.
+#
+# Release signing (optional): when these repository secrets are all set the
+# APK is signed with your release keystore, so it installs as an update over
+# earlier releases:
+#   ANDROID_KEYSTORE_BASE64   base64 of the .jks/.keystore file
+#   ANDROID_KEYSTORE_PASSWORD keystore (store) password
+#   ANDROID_KEY_ALIAS         key alias inside the keystore
+#   ANDROID_KEY_PASSWORD      key password
+# Without them the build falls back to the debug key and emits a warning.
+# Secrets are never available to pull requests from forks, so those builds
+# always use the fallback.
+# -----------------------------------------------------------------------------
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+    outputs:
+      artifact:
+        description: Name of the uploaded artifact containing app-release.apk
+        value: ${{ jobs.android.outputs.artifact }}
+      signed:
+        description: "'true' when the APK was signed with the release keystore"
+        value: ${{ jobs.android.outputs.signed }}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Last 3.35.x stable (Dart 3.9.2): satisfies pubspec `sdk: ^3.9.0` and the
+  # lockfile's `flutter: ">=3.35.0"`, same minor as the iOS workflow.
+  FLUTTER_VERSION: '3.35.7'
+  JAVA_VERSION: '17'
+
+jobs:
+  android:
+    name: Analyze, test and build APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    outputs:
+      artifact: ${{ steps.artifact.outputs.name }}
+      signed: ${{ steps.signing.outputs.signed }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: gradle
+
+      - name: Set up Flutter ${{ env.FLUTTER_VERSION }} (stable)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Verify toolchain
+        run: |
+          flutter --version
+          java -version
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      # Informational only: the codebase has not been verified against the
+      # Dart 3.9 formatter yet. Make this blocking (drop the `|| ...`) once
+      # `dart format lib test` produces no changes.
+      - name: Check formatting (non-blocking)
+        run: |
+          dart format --output=none --set-exit-if-changed lib test \
+            || echo "::warning::Some Dart files are not formatted. Run 'dart format lib test' locally."
+
+      # Analyzer errors fail the build; warnings and infos are reported but
+      # do not block until the existing baseline is cleaned up.
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Test
+        run: flutter test
+
+      - name: Configure release signing
+        id: signing
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          names=(ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD)
+          present=()
+          missing=()
+          for s in "${names[@]}"; do
+            if [ -n "${!s:-}" ]; then present+=("$s"); else missing+=("$s"); fi
+          done
+
+          if [ ${#present[@]} -eq 0 ]; then
+            echo "::warning title=Debug-signed APK::Release signing secrets are not set, so this APK is signed with a throwaway debug key and cannot be installed as an update over previously released APKs."
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Release signing is partially configured. Missing secrets: ${missing[*]}"
+            exit 1
+          fi
+
+          keystore="$RUNNER_TEMP/release-keystore.jks"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore"
+
+          # Fail early (and clearly) if the keystore, password or alias is wrong.
+          if ! keytool -list -keystore "$keystore" -storepass "$ANDROID_KEYSTORE_PASSWORD" \
+               -alias "$ANDROID_KEY_ALIAS" >/dev/null 2>&1; then
+            echo "::error::Could not open the release keystore with the given password/alias. Check the ANDROID_* signing secrets."
+            exit 1
+          fi
+
+          # Java .properties treats backslash as an escape character.
+          esc() { printf '%s' "$1" | sed -e 's/\\/\\\\/g'; }
+          umask 077
+          {
+            echo "storeFile=$(esc "$keystore")"
+            echo "storePassword=$(esc "$ANDROID_KEYSTORE_PASSWORD")"
+            echo "keyAlias=$(esc "$ANDROID_KEY_ALIAS")"
+            echo "keyPassword=$(esc "$ANDROID_KEY_PASSWORD")"
+          } > android/key.properties
+          echo "Release keystore configured."
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Remove signing material
+        if: always()
+        run: rm -f android/key.properties "$RUNNER_TEMP/release-keystore.jks"
+
+      - name: Name artifact
+        id: artifact
+        run: echo "name=noir-player-android-${{ github.sha }}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.artifact.outputs.name }}
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
