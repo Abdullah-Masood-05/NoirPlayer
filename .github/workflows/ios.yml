@@ -8,9 +8,14 @@
 # time.
 #
 # TRIGGERS
-#   push / pull_request / workflow_dispatch / v* tags
-#   On a v* tag the IPA is attached to the GitHub release that release.yml
-#   creates for that tag (upload only; title and notes are left untouched).
+#   push (main, feat/**, ci/**) / pull_request / workflow_dispatch
+#   Every run uploads the artifact `noir-player-ios-<commit sha>` (kept for
+#   30 days). Releases reuse it: when a `v*` tag is pushed, release.yml finds
+#   the successful push run of this workflow for the tagged commit and
+#   attaches its IPA to the release, so tags do not trigger another macOS
+#   build. If the tagged commit has no green run here (e.g. it was pushed to
+#   another branch), run this workflow on the tag first:
+#     gh workflow run ios.yml --ref v<version>
 #   NOTE: GitHub Actions workflows run from the pushed branch (not only main).
 #   The only main-branch quirk is the manual "Run workflow" UI button — it
 #   only appears once this file is on the default branch. On a feature branch
@@ -24,8 +29,6 @@ on:
       - main
       - 'feat/**'
       - 'ci/**'
-    tags:
-      - 'v*'
   pull_request:
   workflow_dispatch:
     inputs:
@@ -49,17 +52,20 @@ on:
         required: false
         default: ''
 
+permissions:
+  contents: read
+
+# Pull requests: a newer push cancels the older run. Pushes: one group per
+# commit, so every pushed commit gets its own IPA a release can reuse.
 concurrency:
-  group: ios-build-${{ github.ref }}
-  cancel-in-progress: true
+  group: ios-build-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build-ios:
     name: Build iOS IPA
     runs-on: macos-latest
     timeout-minutes: 60
-    outputs:
-      signing_enabled: ${{ steps.mode.outputs.value }}
     env:
       # Signed when the manual input is on, OR the repo variable is 'true'.
       SIGNING_ENABLED: ${{ inputs.signing_enabled == true || vars.IOS_SIGNING_ENABLED == 'true' }}
@@ -69,11 +75,13 @@ jobs:
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       # Keep in step with FLUTTER_VERSION in ci.yml.
       - name: Set up Flutter 3.35.7 (stable)
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
           flutter-version: '3.35.7'
@@ -81,10 +89,6 @@ jobs:
 
       - name: Verify Flutter
         run: flutter --version
-
-      - name: Set build mode (exposed to the release job)
-        id: mode
-        run: echo "value=${{ env.SIGNING_ENABLED }}" >> "$GITHUB_OUTPUT"
 
       - name: Bootstrap iOS platform folder (generate + configure)
         run: bash ./.github/scripts/ios_bootstrap.sh
@@ -100,7 +104,7 @@ jobs:
         run: dart run flutter_launcher_icons
 
       - name: Cache CocoaPods
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             ios/Pods
@@ -209,70 +213,12 @@ jobs:
 
       # ----------------------------------------------------------------- artifact
       - name: Upload IPA artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: noir-player-ios-${{ github.sha }}
           if-no-files-found: error
+          retention-days: 30
           path: |
             build/ios/**/*.ipa
             build/ios/iphoneos/Runner.app
 
-  # ---------------------------------------------------------------------- release
-  # Runs only when a version tag (e.g. v1.1.3) is pushed, after the build above
-  # has finished. The release itself (title, notes, APK) is created by the
-  # Release workflow (release.yml); this job only waits for it and uploads the
-  # IPA to it. It never creates the release and never edits its title or notes.
-  publish-release:
-    name: Attach IPA to GitHub release
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: build-ios
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    permissions:
-      contents: write
-    env:
-      SIGNING_ENABLED: ${{ needs.build-ios.outputs.signing_enabled }}
-      TAG: ${{ github.ref_name }}
-      GH_TOKEN: ${{ github.token }}
-      GH_REPO: ${{ github.repository }}
-    steps:
-      - name: Download IPA artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: noir-player-ios-${{ github.sha }}
-          path: release
-
-      - name: Name the IPA for the release
-        run: |
-          set -euo pipefail
-          ipa="$(find release -name '*.ipa' -type f | head -n 1)"
-          if [ -z "$ipa" ]; then
-            echo "::error::No .ipa found in the build artifact." >&2
-            exit 1
-          fi
-          if [ "$SIGNING_ENABLED" = "true" ]; then
-            name="NoirPlayer-${TAG}-ios.ipa"
-          else
-            name="NoirPlayer-${TAG}-ios-unsigned.ipa"
-          fi
-          mkdir -p dist
-          cp "$ipa" "dist/$name"
-          ls -l dist
-
-      - name: Wait for the release created by release.yml
-        run: |
-          set -euo pipefail
-          # The Android release usually finishes first; poll for up to ~45 min.
-          for i in $(seq 1 90); do
-            if gh release view "$TAG" >/dev/null 2>&1; then
-              echo "Release $TAG found."
-              exit 0
-            fi
-            echo "Release $TAG not published yet (check $i/90); waiting 30s..."
-            sleep 30
-          done
-          echo "::error::No GitHub release exists for $TAG. It is created by the Release workflow (release.yml); once it exists, re-run this job. The IPA is still available as a workflow artifact."
-          exit 1
-
-      - name: Upload IPA to the release
-        run: gh release upload "$TAG" dist/*.ipa --clobber

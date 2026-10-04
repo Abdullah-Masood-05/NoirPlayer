@@ -1,32 +1,48 @@
 # -----------------------------------------------------------------------------
-# Noir Player (Android) - release
+# Noir Player - release
 #
-# Trigger: push a tag `v<version>` matching pubspec.yaml (version 1.1.3+5 ->
-# tag v1.1.3). Can also be re-run with "Run workflow", choosing the existing
-# tag as the ref.
+# Trigger: push a tag `v<version>` matching pubspec.yaml (version 1.2.0+6 ->
+# tag v1.2.0). To publish (or re-publish) an existing tag by hand, use
+# "Run workflow" and enter the tag, or: gh workflow run release.yml -f tag=v1.2.0
 #
-# Flow: validate tag/version -> CI checks + APK build (ci.yml) -> publish.
-# The GitHub release is only created/updated after every check passed.
+# Nothing is rebuilt here. The release publishes the exact builds CI already
+# made for the tagged commit:
+#   ci.yml  (push / workflow_dispatch run) -> artifact noir-player-android-<sha>
+#   ios.yml (push / workflow_dispatch run) -> artifact noir-player-ios-<sha>
 #
-# Assets: NoirPlayer-v<version>.apk, NoirPlayer-v<version>.apk.sha256, SHA256SUMS
+# Flow:
+#   1. prepare: check the tag matches pubspec.yaml, resolve the tagged commit,
+#      then find the successful ci.yml and ios.yml runs for it. A run that is
+#      still going is waited for (bounded); if there is no green run the job
+#      fails and asks you to wait for CI to go green (or start it on the tag:
+#      gh workflow run ci.yml --ref v<version> / gh workflow run ios.yml --ref
+#      v<version>) and then re-run this workflow.
+#   2. publish: download both artifacts, refuse a debug-signed APK, name the
+#      files, write checksums and create ONE GitHub release with every asset.
+#
+# Assets:
+#   NoirPlayer-v<version>.apk               (+ .sha256)
+#   NoirPlayer-iOS-v<version>-unsigned.ipa  (+ .sha256; `NoirPlayer-iOS-v<version>.ipa`
+#                                            when ios.yml produced a signed build)
+#   SHA256SUMS                              (all of the above)
 #
 # Release notes - the first source found wins:
-#   1. CHANGELOG.md section headed `## [1.1.3]`, `## v1.1.3` or `## 1.1.3`
-#      (anything after the version on that line is ignored)
-#   2. release-notes/v1.1.3.md
-#   3. the annotated tag's message (`git tag -a v1.1.3 -m "..."`)
+#   1. CHANGELOG.md section headed `## [1.2.0]`, `## v1.2.0` or `## 1.2.0`.
+#      Text after the version on that line (`## [1.2.0] - Short title`, an
+#      optional ISO date first is skipped) becomes the title "v1.2.0 - Short title".
+#   2. release-notes/v1.2.0.md
+#   3. the annotated tag's message (`git tag -a v1.2.0 -m "..."`)
 #   4. GitHub's auto-generated notes
 #   If the notes (from 1-3) start with a `# Heading` line, that line becomes
-#   the release title; otherwise the title is "Noir Player v1.1.3". A short
-#   install/checksum footer is appended.
+#   the title. Otherwise the title is "Noir Player v1.2.0". A short downloads /
+#   checksum footer is appended.
 #
-# Signing: a tagged release must be signed with the release keystore (see
-# ci.yml) so users can update in place. To deliberately publish a
-# debug-signed APK, set repository variable ALLOW_DEBUG_SIGNED_RELEASE=true.
-#
-# iOS: the iOS workflow (ios.yml) builds the IPA for the same tag, waits for
-# the release this workflow creates and uploads the IPA to it. Only this
-# workflow creates the release and sets its title and notes.
+# Signing: a release APK must be signed with the release keystore (see ci.yml)
+# so users can update in place. The certificate is checked with apksigner;
+# a debug certificate is refused unless repository variable
+# ALLOW_DEBUG_SIGNED_RELEASE=true. If repository variable
+# ANDROID_RELEASE_CERT_SHA256 is set, the APK's signing certificate SHA-256
+# must match it.
 # -----------------------------------------------------------------------------
 name: Release
 
@@ -34,31 +50,58 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to publish, e.g. v1.2.0
+        required: true
+        type: string
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
+  # How long to wait for a CI build of the tagged commit that is still running.
+  CI_WAIT_MINUTES: '60'
+  IOS_WAIT_MINUTES: '90'
+
 jobs:
-  validate:
-    name: Validate tag and version
+  prepare:
+    name: Validate tag and find CI builds
+    if: github.repository == 'Abdullah-Masood-05/NoirPlayer'
     runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    permissions:
+      contents: read
+      actions: read
     outputs:
       version: ${{ steps.version.outputs.version }}
       prerelease: ${{ steps.version.outputs.prerelease }}
+      sha: ${{ steps.commit.outputs.sha }}
+      android_run: ${{ steps.runs.outputs.android_run }}
+      ios_run: ${{ steps.runs.outputs.ios_run }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Check tag name
+        run: |
+          if ! printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::'$TAG' is not a version tag like v1.2.0."
+            exit 1
+          fi
+
+      - name: Checkout tag
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          ref: refs/tags/${{ env.TAG }}
           persist-credentials: false
 
       - name: Check tag matches pubspec.yaml version
         id: version
-        env:
-          RELEASE_REF: ${{ github.ref }}
         run: |
           python3 - <<'PY'
           import os, pathlib, re
@@ -68,10 +111,9 @@ jobs:
           full = m.group(1)
           version = full.split('+', 1)[0]
           assert re.fullmatch(r'\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?', version), f'Unsupported version {full!r}'
-          expected = f'refs/tags/v{version}'
-          ref = os.environ['RELEASE_REF']
-          if ref != expected:
-              print(f'::error::Ref {ref} does not match pubspec.yaml version {full} (expected tag v{version}).')
+          tag = os.environ['TAG']
+          if tag != f'v{version}':
+              print(f'::error::Tag {tag} does not match pubspec.yaml version {full} (expected tag v{version}).')
               raise SystemExit(1)
           with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
               out.write(f'version={version}\n')
@@ -79,65 +121,179 @@ jobs:
           print(f'Releasing v{version} (pubspec {full})')
           PY
 
-  checks:
-    name: CI
-    needs: validate
-    uses: ./.github/workflows/ci.yml
-    secrets: inherit
-    permissions:
-      contents: read
+      - name: Resolve tagged commit
+        id: commit
+        run: |
+          sha="$(git rev-parse HEAD)"
+          echo "Tag $TAG points at $sha"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Find successful CI builds for the tagged commit
+        id: runs
+        env:
+          SHA: ${{ steps.commit.outputs.sha }}
+        run: |
+          set -euo pipefail
+
+          # find_run <workflow file> <artifact prefix> <max wait minutes>
+          # Prints the id of the newest successful push/workflow_dispatch run of
+          # the workflow for $SHA that still has the artifact <prefix>-$SHA.
+          find_run() {
+            local wf="$1" prefix="$2" wait_min="$3"
+            local start deadline runs run_id pending total failed artifact
+            start=$(date +%s)
+            deadline=$(( start + wait_min * 60 ))
+            artifact="${prefix}-${SHA}"
+            while :; do
+              if ! runs="$(gh api "repos/${GH_REPO}/actions/workflows/${wf}/runs?head_sha=${SHA}&per_page=100" \
+                     --jq '[.workflow_runs[] | select(.event == "push" or .event == "workflow_dispatch")]')"; then
+                if [ "$(date +%s)" -ge "$deadline" ]; then
+                  echo "::error::Could not list ${wf} runs from the GitHub API." >&2
+                  return 1
+                fi
+                echo "::warning::Listing ${wf} runs failed; retrying in 30s." >&2
+                sleep 30
+                continue
+              fi
+              run_id="$(jq -r '[.[] | select(.conclusion == "success")] | sort_by(.created_at) | last | .id // empty' <<<"$runs")"
+              if [ -n "$run_id" ]; then
+                if [ "$(gh api "repos/${GH_REPO}/actions/runs/${run_id}/artifacts?name=${artifact}" \
+                       --jq '[.artifacts[] | select(.expired | not)] | length')" -eq 0 ]; then
+                  echo "::error::${wf} run ${run_id} for ${SHA} has no artifact ${artifact} (it may have expired). Run it again on the tag (gh workflow run ${wf} --ref ${TAG}), wait for it to go green, then re-run this workflow." >&2
+                  return 1
+                fi
+                echo "${wf}: using run ${run_id} (artifact ${artifact})" >&2
+                echo "$run_id"
+                return 0
+              fi
+              total="$(jq 'length' <<<"$runs")"
+              pending="$(jq '[.[] | select(.status != "completed")] | length' <<<"$runs")"
+              failed="$(jq -r '[.[] | select(.status == "completed")] | sort_by(.created_at) | last | .conclusion // empty' <<<"$runs")"
+              # Runs can take a moment to appear right after a push.
+              if [ "$total" -eq 0 ] && [ $(( $(date +%s) - start )) -lt 300 ]; then
+                pending=1
+              fi
+              if [ "$pending" -eq 0 ]; then
+                if [ -n "$failed" ]; then
+                  echo "::error::The latest ${wf} run for ${SHA} finished as '${failed}'. Wait for CI to go green on this commit (fix it, or re-run it with: gh workflow run ${wf} --ref ${TAG}), then re-run this workflow." >&2
+                else
+                  echo "::error::No ${wf} run exists for ${SHA}. Wait for CI to go green on this commit (start it with: gh workflow run ${wf} --ref ${TAG}), then re-run this workflow." >&2
+                fi
+                return 1
+              fi
+              if [ "$(date +%s)" -ge "$deadline" ]; then
+                echo "::error::${wf} has not finished for ${SHA} after ${wait_min} minutes. Wait for CI to go green, then re-run this workflow." >&2
+                return 1
+              fi
+              echo "${wf}: build for ${SHA} still running; checking again in 30s..." >&2
+              sleep 30
+            done
+          }
+
+          android_run="$(find_run ci.yml noir-player-android "$CI_WAIT_MINUTES")"
+          ios_run="$(find_run ios.yml noir-player-ios "$IOS_WAIT_MINUTES")"
+          {
+            echo "android_run=$android_run"
+            echo "ios_run=$ios_run"
+          } >> "$GITHUB_OUTPUT"
 
   publish:
     name: Publish GitHub release
-    needs: [validate, checks]
-    if: github.repository == 'Abdullah-Masood-05/NoirPlayer'
+    needs: prepare
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     permissions:
-      contents: write
+      contents: write # create the release and upload its assets
+      actions: read   # download artifacts from the CI runs
     env:
-      VERSION: ${{ needs.validate.outputs.version }}
-      PRERELEASE: ${{ needs.validate.outputs.prerelease }}
-      SIGNED: ${{ needs.checks.outputs.signed }}
+      VERSION: ${{ needs.prepare.outputs.version }}
+      PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
+      SHA: ${{ needs.prepare.outputs.sha }}
       ALLOW_DEBUG_SIGNED: ${{ vars.ALLOW_DEBUG_SIGNED_RELEASE }}
-      TAG: ${{ github.ref_name }}
+      EXPECTED_CERT_SHA256: ${{ vars.ANDROID_RELEASE_CERT_SHA256 }}
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
     steps:
-      - name: Require release signing
-        run: |
-          if [ "$SIGNED" != "true" ]; then
-            if [ "$ALLOW_DEBUG_SIGNED" = "true" ]; then
-              echo "::warning title=Debug-signed release::Publishing a debug-signed APK (ALLOW_DEBUG_SIGNED_RELEASE=true). It will not install as an update over earlier releases."
-            else
-              echo "::error::The APK was not signed with the release keystore. Set the ANDROID_* signing secrets (see ci.yml), or set repository variable ALLOW_DEBUG_SIGNED_RELEASE=true to publish anyway."
-              exit 1
-            fi
-          fi
-
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout tag
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          ref: refs/tags/${{ env.TAG }}
           persist-credentials: false
 
       - name: Fetch annotated tag
         run: git fetch --force --no-tags --depth=1 "https://github.com/${GH_REPO}.git" "refs/tags/${TAG}:refs/tags/${TAG}"
 
-      - name: Download APK artifact
-        uses: actions/download-artifact@v4
+      - name: Download APK from CI
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: ${{ needs.checks.outputs.artifact }}
+          name: noir-player-android-${{ needs.prepare.outputs.sha }}
           path: build-apk
+          run-id: ${{ needs.prepare.outputs.android_run }}
+          github-token: ${{ github.token }}
 
-      - name: Rename APK and write checksums
+      - name: Download IPA from the iOS build
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: noir-player-ios-${{ needs.prepare.outputs.sha }}
+          path: build-ipa
+          run-id: ${{ needs.prepare.outputs.ios_run }}
+          github-token: ${{ github.token }}
+
+      - name: Require release signing
+        run: |
+          set -euo pipefail
+          apk=build-apk/app-release.apk
+          test -s "$apk"
+          apksigner="$(ls -d "${ANDROID_HOME:-/usr/local/lib/android/sdk}"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -n 1)"
+          if [ -z "$apksigner" ]; then
+            echo "::error::apksigner was not found in the Android SDK on this runner, so the APK signature cannot be checked."
+            exit 1
+          fi
+          certs="$("$apksigner" verify --print-certs "$apk")"
+          echo "$certs" | grep -E '^Signer #1 certificate (DN|SHA-256)'
+          dn="$(echo "$certs" | sed -n 's/^Signer #1 certificate DN: //p')"
+          digest="$(echo "$certs" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | tr -d ': ' | tr 'A-F' 'a-f')"
+
+          if printf '%s' "$dn" | grep -q 'CN=Android Debug'; then
+            if [ "$ALLOW_DEBUG_SIGNED" = "true" ]; then
+              echo "::warning title=Debug-signed release::Publishing a debug-signed APK (ALLOW_DEBUG_SIGNED_RELEASE=true). It will not install as an update over other releases."
+            else
+              echo "::error::The CI build of ${SHA} is signed with the debug key. Set the ANDROID_* signing secrets (see ci.yml), re-run CI on this commit, then re-run this workflow. To publish anyway, set repository variable ALLOW_DEBUG_SIGNED_RELEASE=true."
+              exit 1
+            fi
+          elif [ -n "$EXPECTED_CERT_SHA256" ]; then
+            expected="$(printf '%s' "$EXPECTED_CERT_SHA256" | tr -d ': ' | tr 'A-F' 'a-f')"
+            if [ "$digest" != "$expected" ]; then
+              echo "::error::The APK is signed with certificate ${digest}, not the release certificate in ANDROID_RELEASE_CERT_SHA256."
+              exit 1
+            fi
+            echo "Signing certificate matches ANDROID_RELEASE_CERT_SHA256."
+          fi
+
+      - name: Name files and write checksums
         run: |
           set -euo pipefail
           mkdir -p dist
           apk="NoirPlayer-v${VERSION}.apk"
-          mv build-apk/app-release.apk "dist/$apk"
-          test -s "dist/$apk"
+          cp build-apk/app-release.apk "dist/$apk"
+
+          mapfile -t ipas < <(find build-ipa -type f -name '*.ipa' | sort)
+          if [ "${#ipas[@]}" -ne 1 ]; then
+            echo "::error::Expected exactly one .ipa in the iOS artifact, found ${#ipas[@]}: ${ipas[*]:-none}"
+            exit 1
+          fi
+          case "${ipas[0]}" in
+            *-unsigned.ipa) ipa="NoirPlayer-iOS-v${VERSION}-unsigned.ipa" ;;
+            *)              ipa="NoirPlayer-iOS-v${VERSION}.ipa" ;;
+          esac
+          cp "${ipas[0]}" "dist/$ipa"
+          echo "IPA_NAME=$ipa" >> "$GITHUB_ENV"
+
           cd dist
+          test -s "$apk" && test -s "$ipa"
           sha256sum "$apk" > "$apk.sha256"
-          cp "$apk.sha256" SHA256SUMS
+          sha256sum "$ipa" > "$ipa.sha256"
+          cat "$apk.sha256" "$ipa.sha256" > SHA256SUMS
           sha256sum --check SHA256SUMS
           ls -l
 
@@ -145,19 +301,24 @@ jobs:
         run: |
           python3 - <<'PY'
           import os, pathlib, re, subprocess
-          version, tag = os.environ['VERSION'], os.environ['TAG']
-          notes, source = '', None
+          version, tag, ipa = os.environ['VERSION'], os.environ['TAG'], os.environ['IPA_NAME']
+          notes, source, title = '', None, None
 
           changelog = pathlib.Path('CHANGELOG.md')
           if changelog.is_file():
-              pattern = r'^##\s+(?:\[v?' + re.escape(version) + r'\]|v?' + re.escape(version) + r'\b)[^\n]*\n(.*?)(?=^##\s|\Z)'
-              m = re.search(pattern, changelog.read_text(), re.M | re.S)
-              if m and m.group(1).strip():
-                  notes, source = m.group(1).strip(), 'CHANGELOG.md'
+              pattern = (r'^##\s+(?:\[v?' + re.escape(version) + r'\]|v?' + re.escape(version) + r'\b)'
+                         r'([^\n]*)\n(.*?)(?=^##\s|\Z)')
+              m = re.search(pattern, changelog.read_text(encoding='utf-8'), re.M | re.S)
+              if m and m.group(2).strip():
+                  notes, source = m.group(2).strip(), 'CHANGELOG.md'
+                  suffix = re.sub(r'^[\s\-–—:]*', '', m.group(1))
+                  suffix = re.sub(r'^\d{4}-\d{2}-\d{2}[\s\-–—:]*', '', suffix).strip()
+                  if suffix:
+                      title = f'{tag} - {suffix}'
 
           notes_file = pathlib.Path('release-notes') / f'{tag}.md'
-          if not notes and notes_file.is_file() and notes_file.read_text().strip():
-              notes, source = notes_file.read_text().strip(), str(notes_file)
+          if not notes and notes_file.is_file() and notes_file.read_text(encoding='utf-8').strip():
+              notes, source = notes_file.read_text(encoding='utf-8').strip(), str(notes_file)
 
           if not notes:
               kind = subprocess.run(['git', 'cat-file', '-t', tag], capture_output=True, text=True).stdout.strip()
@@ -167,22 +328,23 @@ jobs:
                   if msg and msg != tag:
                       notes, source = msg, 'tag message'
 
-          title = f'Noir Player {tag}'
           lines = notes.splitlines()
           if lines and re.match(r'^#\s+\S', lines[0]):
               title = lines[0][1:].strip()
               notes = '\n'.join(lines[1:]).strip()
+          title = title or f'Noir Player {tag}'
 
           apk = f'NoirPlayer-v{version}.apk'
-          footer = (f'### Install\n'
-                    f'Download **`{apk}`** below. You may need to allow installing from unknown sources.\n'
-                    f'Verify the download against `SHA256SUMS` (`sha256sum --check SHA256SUMS`).\n')
-          if notes:
-              body = notes + '\n\n' + footer
-          else:
-              body = footer
-          pathlib.Path('release-notes.md').write_text(body)
-          pathlib.Path('release-title.txt').write_text(title)
+          ipa_line = (f'- **iPhone / iPad:** `{ipa}` is not signed; sideload it with a tool such as Sideloadly or AltStore.\n'
+                      if ipa.endswith('-unsigned.ipa') else
+                      f'- **iPhone / iPad:** `{ipa}`.\n')
+          footer = ('### Downloads\n'
+                    f'- **Android:** `{apk}`. You may need to allow installing from unknown sources.\n'
+                    + ipa_line +
+                    '- Check a download against `SHA256SUMS` with `sha256sum --check SHA256SUMS --ignore-missing`.\n')
+          body = notes + '\n\n' + footer if notes else footer
+          pathlib.Path('release-notes.md').write_text(body, encoding='utf-8')
+          pathlib.Path('release-title.txt').write_text(title, encoding='utf-8')
           with open(os.environ['GITHUB_ENV'], 'a') as env:
               env.write(f"GENERATE_NOTES={'false' if source else 'true'}\n")
           print(f'Title: {title}\nNotes source: {source or "GitHub auto-generated"}')
@@ -192,10 +354,10 @@ jobs:
         run: |
           set -euo pipefail
           title="$(cat release-title.txt)"
-          assets=(dist/*.apk dist/*.apk.sha256 dist/SHA256SUMS)
+          assets=(dist/*.apk dist/*.ipa dist/*.sha256 dist/SHA256SUMS)
 
           update_existing() {
-            echo "Release $TAG already exists (e.g. a re-run); updating its Android assets, title and notes."
+            echo "Release $TAG already exists (e.g. a re-run); updating its assets, title and notes."
             gh release upload "$TAG" "${assets[@]}" --clobber
             gh release edit "$TAG" --title "$title" --notes-file release-notes.md
           }
@@ -210,7 +372,6 @@ jobs:
           [ "$GENERATE_NOTES" = "true" ] && args+=(--generate-notes)
 
           if ! gh release create "$TAG" "${assets[@]}" "${args[@]}"; then
-            # Another workflow may have created it in the meantime.
             if gh release view "$TAG" >/dev/null 2>&1; then
               update_existing
             else

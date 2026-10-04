@@ -1,10 +1,15 @@
 # -----------------------------------------------------------------------------
 # Noir Player (Android) - continuous integration
 #
-# Runs on every branch push and pull request: pub get, analyze, test, then
-# builds the release APK and uploads it as a workflow artifact.
-# Also callable from release.yml (workflow_call) so tagged releases go through
-# exactly the same checks and reuse the APK built here.
+# Runs on every branch push (main included) and pull request: pub get,
+# analyze, test, then builds the release APK and uploads it as the workflow
+# artifact `noir-player-android-<commit sha>` (kept for 30 days).
+#
+# Releases reuse that artifact: when a `v*` tag is pushed, release.yml looks
+# up the successful push run of this workflow for the tagged commit and
+# publishes its APK, so nothing is rebuilt. Tag a commit only after this
+# workflow is green for it (or run it on the tag: gh workflow run ci.yml
+# --ref v<version>).
 #
 # Release signing (optional): when these repository secrets are all set the
 # APK is signed with your release keystore, so it installs as an update over
@@ -24,20 +29,14 @@ on:
     branches: ["**"]
   pull_request:
   workflow_dispatch:
-  workflow_call:
-    outputs:
-      artifact:
-        description: Name of the uploaded artifact containing app-release.apk
-        value: ${{ jobs.android.outputs.artifact }}
-      signed:
-        description: "'true' when the APK was signed with the release keystore"
-        value: ${{ jobs.android.outputs.signed }}
 
 permissions:
   contents: read
 
+# Pull requests: a newer push cancels the older run. Pushes: one group per
+# commit, so every pushed commit gets its own build a release can reuse.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
@@ -51,24 +50,21 @@ jobs:
     name: Analyze, test and build APK
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    outputs:
-      artifact: ${{ steps.artifact.outputs.name }}
-      signed: ${{ steps.signing.outputs.signed }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
 
       - name: Set up Java ${{ env.JAVA_VERSION }}
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
           cache: gradle
 
       - name: Set up Flutter ${{ env.FLUTTER_VERSION }} (stable)
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
           flutter-version: ${{ env.FLUTTER_VERSION }}
@@ -159,10 +155,10 @@ jobs:
         run: echo "name=noir-player-android-${{ github.sha }}" >> "$GITHUB_OUTPUT"
 
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ steps.artifact.outputs.name }}
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30
           compression-level: 0
