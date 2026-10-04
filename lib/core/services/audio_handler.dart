@@ -236,8 +236,8 @@ class AudioPlayerHandler extends BaseAudioHandler {
       return MediaItem(
         id: song.id.toString(),
         title: song.title,
-        artist: song.artist ?? 'Unknown Artist',
-        album: song.album ?? '',
+        artist: _cleanTag(song.artist) ?? 'Unknown Artist',
+        album: _cleanTag(song.album) ?? '',
         duration: song.duration != null
             ? Duration(milliseconds: song.duration!)
             : null,
@@ -254,6 +254,15 @@ class AudioPlayerHandler extends BaseAudioHandler {
       );
     }
     throw Exception('Unsupported song type');
+  }
+
+  /// MediaStore reports missing tags as the literal "<unknown>"; treat that
+  /// (and blanks) as absent so the notification / Now Bar / island never
+  /// shows "<unknown>" as the artist line.
+  static String? _cleanTag(String? value) {
+    final v = value?.trim();
+    if (v == null || v.isEmpty || v == '<unknown>') return null;
+    return v;
   }
 
   String _pathOf(dynamic song) {
@@ -550,6 +559,22 @@ class AudioPlayerHandler extends BaseAudioHandler {
       // The next library tap rebuilds the real queue.
       _sourceMatchesQueue = false;
       _songs = [];
+
+      // Restore the artwork too, so the paused notification / lock screen /
+      // Now Bar shows the cover instead of a blank tile until the next track.
+      final songId = int.tryParse(item.id);
+      if (songId != null) {
+        final uri = await _loadArtUri(songId);
+        final current = mediaItem.value;
+        if (uri != null && current != null && current.id == item.id) {
+          final withArt = current.copyWith(artUri: uri);
+          // Only touch the queue if it is still the one-item restore queue.
+          if (queue.value.length == 1 && queue.value.first.id == item.id) {
+            queue.add([withArt]);
+          }
+          mediaItem.add(withArt);
+        }
+      }
     } catch (e) {
       debugPrint('❌ Error restoring last song: $e');
     }

@@ -14,6 +14,13 @@
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
+    <!-- Android 13+ notification permission. The media-session notification is
+         exempt from it, but declaring it (as VLC does) keeps every other
+         notification and a future runtime request working. Android 16
+         POST_PROMOTED_NOTIFICATIONS is deliberately NOT declared: Live Updates
+         do not accept MediaStyle; the system media controls / OEM Now Bar /
+         islands pick up the MediaSession automatically. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     
     <!-- Media session and control permissions -->
     <uses-permission android:name="android.permission.MEDIA_CONTENT_CONTROL"/>
