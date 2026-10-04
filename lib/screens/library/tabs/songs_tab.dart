@@ -2,6 +2,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:noir_player/core/services/audio_handler.dart';
+import 'package:noir_player/core/services/notification_permission.dart';
 import 'package:noir_player/core/services/playlist_service.dart';
 import 'package:noir_player/core/services/settings_service.dart';
 import 'package:on_audio_query/on_audio_query.dart' hide PlaylistModel;
@@ -77,6 +78,7 @@ class _SongsTabState extends State<SongsTab>
     if (await Permission.audio.isGranted ||
         await Permission.storage.isGranted) {
       _loadSongs();
+      _askForNotifications();
       return;
     }
 
@@ -94,6 +96,7 @@ class _SongsTabState extends State<SongsTab>
         );
       }
       _loadSongs();
+      _askForNotifications();
     } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -107,6 +110,29 @@ class _SongsTabState extends State<SongsTab>
         );
       }
     }
+  }
+
+  /// Once storage is sorted, ask (one time) for the Android 13+ notification
+  /// permission: without it OEM pop-up players (OnePlus Live Alerts, HyperOS
+  /// island, Samsung Now Bar) may not show the playing song.
+  Future<void> _askForNotifications() async {
+    final status = await NotificationPermission.maybeRequest();
+    if (status == null || status.isGranted || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text(
+          'Notifications are off, so the pop-up player (Live Alerts / '
+          'island) may not show the playing song.',
+        ),
+        action: SnackBarAction(
+          label: 'Settings',
+          onPressed: () => openAppSettings(),
+        ),
+        duration: const Duration(seconds: 6),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
   }
 
   Future<void> _loadSongs() async {
