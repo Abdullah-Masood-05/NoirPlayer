@@ -9,15 +9,15 @@
 <p>
   <a href="https://github.com/Abdullah-Masood-05/NoirPlayer/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/Abdullah-Masood-05/NoirPlayer?label=release&color=blue"></a>
   <a href="https://github.com/Abdullah-Masood-05/NoirPlayer/releases/latest"><img alt="Downloads" src="https://img.shields.io/github/downloads/Abdullah-Masood-05/NoirPlayer/total?color=brightgreen"></a>
-  <a href="https://flutter.dev"><img alt="Flutter" src="https://img.shields.io/badge/Flutter-3.9+-02569B?logo=flutter&logoColor=white"></a>
+  <a href="https://flutter.dev"><img alt="Flutter" src="https://img.shields.io/badge/Flutter-3.35.7-02569B?logo=flutter&logoColor=white"></a>
   <a href="https://dart.dev"><img alt="Dart" src="https://img.shields.io/badge/Dart-3.9+-0175C2?logo=dart&logoColor=white"></a>
-  <img alt="Platform" src="https://img.shields.io/badge/Platform-Android-3DDC84?logo=android&logoColor=white">
+  <img alt="Platform" src="https://img.shields.io/badge/Platform-Android%20%7C%20iOS-3DDC84?logo=android&logoColor=white">
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/License-MIT-yellow.svg"></a>
   <a href="https://github.com/Abdullah-Masood-05/noir-player-desktop-app"><img alt="Desktop" src="https://img.shields.io/badge/Desktop-Windows%20%7C%20macOS%20%7C%20Linux-E53935?logo=rust&logoColor=white"></a>
 </p>
 
 <p>
-  <a href="https://github.com/Abdullah-Masood-05/NoirPlayer/releases/latest"><b>📥 Download the latest APK</b></a>
+  <a href="https://github.com/Abdullah-Masood-05/NoirPlayer/releases/latest"><b>📥 Download for Android or iPhone</b></a>
   &nbsp;·&nbsp;
   <a href="https://github.com/Abdullah-Masood-05/noir-player-desktop-app/releases/latest"><b>🖥️ Get it for desktop</b></a>
 </p>
@@ -31,6 +31,7 @@
 - [📦 Overview](#-overview)
 - [✨ Features](#-features)
 - [📥 Download](#-download)
+  - [Updating from 1.1.x](#updating-from-11x)
 - [🖥️ Noir Player for Desktop](#️-noir-player-for-desktop)
 - [🖼️ Screens](#️-screens)
 - [📁 Project Structure](#-project-structure)
@@ -39,6 +40,7 @@
   - [Installation](#installation)
   - [🔑 Discover Setup](#-discover-setup)
   - [Running the App](#running-the-app)
+- [🏗️ Building / CI](#️-building--ci)
 - [🧭 How It Works](#-how-it-works)
 - [🛠️ Architecture](#️-architecture)
 - [📦 Dependencies](#-dependencies)
@@ -52,9 +54,9 @@
 Noir Player is a small, focused Flutter app that:
 
 1. **Loads your local audio files** from the device library.
-2. **Shows them in a tabbed library** (`Songs`, `Albums`, `Artists`, `Playlists`).
-3. **Runs a background audio service**, so playback keeps going when the app is backgrounded or the screen is locked — with media controls on the notification, lock screen and dynamic island.
-4. **Discovers new music** — browse trending tracks and search by name via the **Last.fm** API.
+2. **Shows them in a tabbed library** (`Music`, `Audio`, `Albums`, `Artists`), with playlists one tap away.
+3. **Runs a background audio service**, so playback keeps going when the app is backgrounded or the screen is locked — with the song's title, artist and cover art on the standard media notification, which the lock screen, the Samsung Now Bar and other system media controls pick up.
+4. **Discovers new music** — browse trending tracks and search by name through **Noir Player's server**, the same one the desktop app uses. You can add your own Last.fm, YouTube or RapidAPI keys in **Settings → Discover** if you like.
 5. **Streams & downloads** — preview tracks and save them as MP3 to your device's music folder.
 6. **Tailors playback** — sleep timer, playback speed, resume‑after‑a‑call and more, all in a sectioned Settings page reached from the side drawer.
 
@@ -66,29 +68,43 @@ Noir Player is a small, focused Flutter app that:
 
 | Feature | Where | How it works |
 |---|---|---|
-| 🎼 **Tabbed Library** | `library_screen.dart` | Songs / Albums / Artists / Playlists via `on_audio_query` |
+| 🎼 **Tabbed Library** | `library_screen.dart` | Music / Audio / Albums / Artists via `on_audio_query` |
 | ▶️ **Now Playing** | `player_screen.dart` | Reactive UI bound to `audioHandler.mediaItem` & `playbackState` |
-| 🔊 **Background Playback** | `audio_handler.dart` | `audio_service` + `just_audio` with notification / lock‑screen / dynamic‑island controls and artwork |
-| 🧭 **Discover** | `discover_screen.dart` | Trending + search powered by Last.fm, with album art |
-| ⬇️ **Download** | `music_discovery_service.dart` | Resolves YouTube → MP3 (RapidAPI) and saves via `media_store_plus`, with duplicate‑download protection |
+| 🔊 **Background Playback** | `audio_handler.dart` | `audio_service` + `just_audio` with a standard media notification (title, artist, cover art) that the lock screen, Samsung Now Bar and other system media controls show |
+| 🧭 **Discover** | `discover_screen.dart` | Trending + search with album art, through Noir Player's server or your own keys |
+| ⬇️ **Download** | `music_discovery_service.dart` | Resolves YouTube → MP3 and saves straight into your Music folder, with duplicate‑download protection |
+| 🎚️ **Equalizer** | `equalizer_screen.dart` | Native equalizer bands and presets |
 | ⏱️ **Sleep Timer** | `sleep_timer_service.dart` | Auto‑pause after a chosen duration, with a live countdown |
 | ⏩ **Playback Speed** | `audio_handler.dart` | 0.5×–2× without pitch change, persisted |
 | 📞 **Call / interruption handling** | `audio_handler.dart` | Resume after a call via `audio_session` |
-| ⚙️ **Persistent Settings** | `settings_service.dart` | Theme, playback and notification options saved with `shared_preferences` |
+| ⚙️ **Persistent Settings** | `settings_service.dart` | Theme, playback, notification and Discover‑key options saved with `shared_preferences` |
 
 ---
 
 ## 📥 Download
 
-Grab the latest signed APK from the **[Releases](https://github.com/Abdullah-Masood-05/NoirPlayer/releases/latest)** page
-(`NoirPlayer-vX.Y.Z.apk`) and install it on Android 6.0+. You may need to allow installing from unknown sources.
+Every release on the **[Releases](https://github.com/Abdullah-Masood-05/NoirPlayer/releases/latest)** page has
+an Android APK and an iOS build, plus a `SHA256SUMS` file to check your download against.
 
-On iPhone? Releases also include an unsigned iOS build (`NoirPlayer-vX.Y.Z-ios-unsigned.ipa`) that you can
-sideload with a tool such as Sideloadly. It is built on GitHub Actions; see the [iOS build guide](docs/iOS_BUILD_GUIDE.md).
+**Android** — download `NoirPlayer-vX.Y.Z.apk` on your phone (Android 7.0 or newer), open it and tap
+**Install**. If Android asks, allow your browser or file manager to install unknown apps.
+
+**iPhone / iPad** — download `NoirPlayer-iOS-vX.Y.Z-unsigned.ipa` and sideload it with a tool such as
+**Sideloadly** or **AltStore**, which signs it with your own Apple ID. It is built on GitHub Actions; see the
+[iOS build guide](docs/iOS_BUILD_GUIDE.md).
+
+### Updating from 1.1.x
+
+Version 1.2.0 is signed with a new, permanent release key, so Android won't install it over an earlier
+version. Uninstall the old Noir Player first, then install 1.2.0. Playlists and settings stored on the
+device aren't carried over. Later updates install over 1.2.0 normally.
 
 | Version | Notes |
 |---|---|
-| **v1.1.1** | Native equalizer (bands + presets) |
+| **v1.2.0** | Discover through Noir Player's server, your own keys in Settings → Discover, cleaner now‑playing info on system media controls, unsigned iOS IPA |
+| v1.1.3 | Instant Library tab switching, Back returns to Library |
+| v1.1.2 | Reliable downloads into your Music folder, choose the download folder |
+| v1.1.1 | Native equalizer (bands + presets) |
 | v1.1.0 | Music‑folder tab, repeat/shuffle, Discover plays in the main player, playlist/favourites fixes, immersive UI + animations |
 | v1.0.0 | Online discovery, downloads, media controls and full playback settings |
 | v0.2.0 | Firebase authentication (experimental, pre‑release) |
@@ -107,7 +123,7 @@ from scratch in **Rust** with **GPUI Kit** rather than Flutter.
 | **Built with** | Flutter · Dart | Rust · GPUI Kit |
 | **Runs on** | Android · iOS (unsigned IPA) | Windows · macOS · Linux |
 | **Library** | Device audio via `on_audio_query` | Folder scanning, sorted A→Z under letter headings |
-| **Playback** | Background service, notification & lock‑screen controls | Desktop transport bar, click‑to‑seek, queue rail |
+| **Playback** | Background service, notification, lock‑screen & Now Bar controls | Desktop transport bar, click‑to‑seek, queue rail |
 | **Extras** | Sleep timer, playback speed | 5‑band equalizer, embedded lyrics, in‑app updates |
 | **Discover** | Last.fm search, YouTube → MP3 download, through Noir Player's server | The same services, through the same server |
 
@@ -127,7 +143,7 @@ A **4‑tab bottom bar** plus a **hamburger drawer** for everything else:
 | 🎵 **Player** | bottom bar | The full "Now Playing" view (with speed & sleep‑timer actions) |
 | 🎶 **Playlists** | bottom bar | Create and browse playlists |
 | 🧭 **Discover** | bottom bar | Trending tracks, search, stream & download |
-| ⚙️ **Settings** | drawer | Appearance, playback, notification & timer options |
+| ⚙️ **Settings** | drawer | Appearance, playback, notification, timer & Discover options |
 | ⏱️ **Sleep Timer** | drawer | Start / cancel the auto‑stop timer |
 | ℹ️ **About** | drawer | App info |
 
@@ -171,9 +187,9 @@ lib/
 
 | Requirement | Version |
 |---|---|
-| Flutter SDK | ≥ 3.9 |
-| Dart SDK | ≥ 3.9 |
-| Android | 6.0 (API 23)+ |
+| Flutter SDK | 3.35.7 (the version CI uses) |
+| Dart SDK | 3.9 (bundled with Flutter) |
+| Android | 7.0 (API 24)+ |
 
 ```bash
 flutter --version
@@ -213,6 +229,25 @@ flutter run -d android
 ```
 
 > On first launch the app requests permission to read your music library and to download files. Grant them and the library populates automatically.
+
+---
+
+## 🏗️ Building / CI
+
+GitHub Actions does the building, with **Flutter 3.35.7**:
+
+- **Every push** runs `ci.yml` (`flutter analyze`, `flutter test`, then a release APK) and `ios.yml`
+  (an unsigned IPA on a macOS runner). Both builds are kept as workflow artifacts for 30 days.
+- **Releases** publish what CI already built. Pushing a tag `vX.Y.Z` that matches the `version:` in
+  `pubspec.yaml` runs `release.yml`, which takes the APK and IPA from the green CI runs for the tagged
+  commit, adds checksums and the notes from [`CHANGELOG.md`](CHANGELOG.md), and creates the GitHub
+  release. Tag a commit once CI is green for it.
+- **Release signing:** the APK is release‑signed when these repository secrets are set:
+  `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and
+  `ANDROID_KEY_PASSWORD`. Without them CI signs with a debug key, and `release.yml` won't publish
+  that APK.
+
+To build locally, `flutter build apk --release` produces `build/app/outputs/flutter-apk/app-release.apk`.
 
 ---
 
@@ -269,7 +304,8 @@ server, or directly with your own key for any service you added one for in Setti
 | [`permission_handler`](https://pub.dev/packages/permission_handler) | Runtime permissions |
 | [`provider`](https://pub.dev/packages/provider) · [`shared_preferences`](https://pub.dev/packages/shared_preferences) | State & persistence |
 | [`http`](https://pub.dev/packages/http) · [`dio`](https://pub.dev/packages/dio) | Networking & file download |
-| [`media_store_plus`](https://pub.dev/packages/media_store_plus) · [`path_provider`](https://pub.dev/packages/path_provider) | Saving downloads to device storage |
+| [`path_provider`](https://pub.dev/packages/path_provider) | Locating device folders for downloads |
+| [`flutter_animate`](https://pub.dev/packages/flutter_animate) | UI animations |
 
 > Run `flutter pub get` to install everything declared in `pubspec.yaml`.
 
@@ -297,6 +333,6 @@ Distributed under the **MIT License**. See [LICENSE](LICENSE) for details.
 
 **🎧 Enjoy the music with Noir Player!**
 
-📱 Android · 🖥️ [Windows, macOS & Linux](https://github.com/Abdullah-Masood-05/noir-player-desktop-app)
+📱 Android · iOS · 🖥️ [Windows, macOS & Linux](https://github.com/Abdullah-Masood-05/noir-player-desktop-app)
 
 </div>
