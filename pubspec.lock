@@ -199,7 +199,7 @@ packages:
     source: hosted
     version: "0.14.4"
   flutter_lints:
-    dependency: "direct overridden"
+    dependency: "direct dev"
     description:
       name: flutter_lints
       sha256: "5398f14efa795ffb7a33e9b6a08798b26a180edac4ad7db3f231e40f82ce11e1"
@@ -377,13 +377,12 @@ packages:
     source: hosted
     version: "2.9.0"
   on_audio_query_android:
-    dependency: "direct overridden"
+    dependency: transitive
     description:
-      path: "packages/on_audio_query_android"
-      ref: HEAD
-      resolved-ref: "90e9ab8d724fe8553920c3f14efa5459041d4989"
-      url: "https://github.com/LucJosin/on_audio_query.git"
-    source: git
+      name: on_audio_query_android
+      sha256: c0b946011ee7aa8ec76b21837f0cb0007120ac291202ed6c6fb4c498ba2ff6fe
+      url: "https://pub.dev"
+    source: hosted
     version: "1.1.0"
   on_audio_query_ios:
     dependency: transitive
