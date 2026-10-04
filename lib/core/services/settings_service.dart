@@ -24,14 +24,50 @@ class SettingsService extends ChangeNotifier {
   /// Stop playback when the app is swiped away from recents.
   bool stopOnAppSwipe = false;
 
-  /// Show rewind / fast-forward buttons in the media notification.
+  /// Show back / forward seek buttons in the media notification and system
+  /// media controls.
   bool seekButtonsInNotification = false;
 
   /// Playback speed multiplier (0.5–2.0).
   double playbackSpeed = 1.0;
 
-  /// Rewind / fast-forward step, in seconds.
-  int seekIntervalSeconds = 10;
+  /// Seek back / forward step, in seconds. Used by the player screen buttons,
+  /// the notification / lock screen controls and headset seek keys.
+  int seekIntervalSeconds = defaultSeekIntervalSeconds;
+
+  /// Seek step limits and the preset choices offered in Settings.
+  static const int defaultSeekIntervalSeconds = 10;
+  static const int minSeekIntervalSeconds = 1;
+  static const int maxSeekIntervalSeconds = 300;
+  static const List<int> seekIntervalPresets = [5, 10, 15, 30, 60];
+
+  /// True if [seconds] is an allowed seek step.
+  static bool isValidSeekInterval(int? seconds) =>
+      seconds != null &&
+      seconds >= minSeekIntervalSeconds &&
+      seconds <= maxSeekIntervalSeconds;
+
+  /// [seconds] if it is an allowed seek step, otherwise the default.
+  static int sanitizeSeekInterval(int? seconds) =>
+      isValidSeekInterval(seconds) ? seconds! : defaultSeekIntervalSeconds;
+
+  /// Parses user input for a custom seek step. Returns null unless [text] is
+  /// a whole number of seconds within the allowed range.
+  static int? parseSeekInterval(String text) {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty || !RegExp(r'^[0-9]+$').hasMatch(trimmed)) return null;
+    final seconds = int.tryParse(trimmed);
+    return isValidSeekInterval(seconds) ? seconds : null;
+  }
+
+  /// Settings label for a seek step: "10 seconds" for a preset, otherwise
+  /// "Custom (N seconds)".
+  static String seekIntervalLabel(int seconds) {
+    final unit = seconds == 1 ? 'second' : 'seconds';
+    return seekIntervalPresets.contains(seconds)
+        ? '$seconds $unit'
+        : 'Custom ($seconds $unit)';
+  }
 
   /// Folder the Library's "Music" tab loads from. Null = the device Music
   /// folder (paths containing `/music/`).
@@ -72,7 +108,7 @@ class SettingsService extends ChangeNotifier {
     stopOnAppSwipe = prefs.getBool(_kStopOnAppSwipe) ?? false;
     seekButtonsInNotification = prefs.getBool(_kSeekButtons) ?? false;
     playbackSpeed = prefs.getDouble(_kPlaybackSpeed) ?? 1.0;
-    seekIntervalSeconds = prefs.getInt(_kSeekInterval) ?? 10;
+    seekIntervalSeconds = sanitizeSeekInterval(prefs.getInt(_kSeekInterval));
     musicFolderPath = prefs.getString(_kMusicFolder);
     equalizerEnabled = prefs.getBool(_kEqEnabled) ?? false;
     equalizerBandGains = (prefs.getStringList(_kEqGains) ?? const [])
@@ -139,7 +175,9 @@ class SettingsService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Ignores values outside [minSeekIntervalSeconds]..[maxSeekIntervalSeconds].
   Future<void> setSeekIntervalSeconds(int v) async {
+    if (!isValidSeekInterval(v)) return;
     seekIntervalSeconds = v;
     await _prefs?.setInt(_kSeekInterval, v);
     notifyListeners();
