@@ -83,6 +83,9 @@ Noir Player is a small, focused Flutter app that:
 Grab the latest signed APK from the **[Releases](https://github.com/Abdullah-Masood-05/NoirPlayer/releases/latest)** page
 (`NoirPlayer-vX.Y.Z.apk`) and install it on Android 6.0+. You may need to allow installing from unknown sources.
 
+On iPhone? Releases also include an unsigned iOS build (`NoirPlayer-vX.Y.Z-ios-unsigned.ipa`) that you can
+sideload with a tool such as Sideloadly. It is built on GitHub Actions; see the [iOS build guide](docs/iOS_BUILD_GUIDE.md).
+
 | Version | Notes |
 |---|---|
 | **v1.1.1** | Native equalizer (bands + presets) |
@@ -102,7 +105,7 @@ from scratch in **Rust** with **GPUI Kit** rather than Flutter.
 | | 📱 Mobile (this repo) | 🖥️ [Desktop](https://github.com/Abdullah-Masood-05/noir-player-desktop-app) |
 |---|---|---|
 | **Built with** | Flutter · Dart | Rust · GPUI Kit |
-| **Runs on** | Android | Windows · macOS · Linux |
+| **Runs on** | Android · iOS (unsigned IPA) | Windows · macOS · Linux |
 | **Library** | Device audio via `on_audio_query` | Folder scanning, sorted A→Z under letter headings |
 | **Playback** | Background service, notification & lock‑screen controls | Desktop transport bar, click‑to‑seek, queue rail |
 | **Extras** | Sleep timer, playback speed | 5‑band equalizer, embedded lyrics, in‑app updates |

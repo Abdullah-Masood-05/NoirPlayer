@@ -53,9 +53,12 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
     
-flutter_icons:
+flutter_launcher_icons:
   android: true
+  ios: true
   image_path: "assets/icon/app_icon.png"
+  remove_alpha_ios: true
+  background_color_ios: "#ffffff"
 
 
 

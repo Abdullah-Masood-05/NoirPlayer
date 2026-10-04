@@ -24,9 +24,9 @@
 # ci.yml) so users can update in place. To deliberately publish a
 # debug-signed APK, set repository variable ALLOW_DEBUG_SIGNED_RELEASE=true.
 #
-# iOS: the iOS workflow (feat/ios-cicd branch) attaches its IPA to the release
-# for the same tag. Whichever workflow finishes first creates the release; the
-# other only adds its assets, so there is never a duplicate release.
+# iOS: the iOS workflow (ios.yml) builds the IPA for the same tag, waits for
+# the release this workflow creates and uploads the IPA to it. Only this
+# workflow creates the release and sets its title and notes.
 # -----------------------------------------------------------------------------
 name: Release
 
@@ -195,7 +195,7 @@ jobs:
           assets=(dist/*.apk dist/*.apk.sha256 dist/SHA256SUMS)
 
           update_existing() {
-            echo "Release $TAG already exists (e.g. created by the iOS workflow); adding Android assets."
+            echo "Release $TAG already exists (e.g. a re-run); updating its Android assets, title and notes."
             gh release upload "$TAG" "${assets[@]}" --clobber
             gh release edit "$TAG" --title "$title" --notes-file release-notes.md
           }

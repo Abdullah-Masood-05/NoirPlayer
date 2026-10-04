@@ -1,4 +1,5 @@
 import 'package:audio_service/audio_service.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:noir_player/core/services/audio_handler.dart';
 import 'package:noir_player/core/services/playlist_service.dart';
@@ -65,6 +66,14 @@ class _SongsTabState extends State<SongsTab>
   }
 
   Future<void> _requestPermissionAndLoad() async {
+    // iOS: there is no storage/microphone gate. The media-library permission
+    // is requested by on_audio_query itself (NSAppleMusicUsageDescription), so
+    // just load the songs. (Permission.audio maps to the microphone on iOS.)
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      _loadSongs();
+      return;
+    }
+
     if (await Permission.audio.isGranted ||
         await Permission.storage.isGranted) {
       _loadSongs();

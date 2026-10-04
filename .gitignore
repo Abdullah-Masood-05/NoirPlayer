@@ -52,3 +52,14 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# iOS — generated on the macOS CI runner. Only these committed files are kept:
+#   ios/Podfile, ios/Runner/Info.plist, ios/ExportOptions.plist
+**/ios/.last_build_id
+**/ios/Pods/
+**/ios/.symlinks/
+**/ios/Flutter/ephemeral/
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/Flutter/Overrides.xcconfig
+**/ios/Runner/GeneratedPluginRegistrant.*

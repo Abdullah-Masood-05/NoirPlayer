@@ -172,6 +172,9 @@ class MusicDiscoveryService {
   /// storage permission. Requesting `manageExternalStorage` opens the system
   /// "All files access" screen.
   Future<bool> _ensureWritePermission() async {
+    // iOS has no shared-storage permission: downloads go into the app's own
+    // sandboxed Documents folder.
+    if (Platform.isIOS) return true;
     if (await Permission.manageExternalStorage.isGranted) return true;
     // Legacy storage permission covers Android 10 and below.
     if (await Permission.storage.request().isGranted) return true;
@@ -181,7 +184,12 @@ class MusicDiscoveryService {
 
   /// Resolve the folder downloads are saved into: the user-selected music
   /// folder if set, otherwise the device's default public Music directory.
+  /// On iOS this is always the app's Documents/NoirPlayerDownloads folder.
   Future<String> downloadDirectory() async {
+    if (Platform.isIOS) {
+      final docDir = await getApplicationDocumentsDirectory();
+      return '${docDir.path}/NoirPlayerDownloads';
+    }
     final custom = SettingsService.instance.musicFolderPath;
     if (custom != null && custom.trim().isNotEmpty) return custom;
     return _defaultMusicDirectory();
@@ -245,11 +253,14 @@ class MusicDiscoveryService {
             onProgress?.call(received, total),
       );
 
-      // Make the new file visible in the media library straight away.
-      try {
-        await _audioQuery.scanMedia(filePath);
-      } catch (e) {
-        _logError('Media scan failed for $filePath: $e');
+      // Make the new file visible in the media library straight away
+      // (Android only; on iOS the file stays in the app's sandbox).
+      if (!Platform.isIOS) {
+        try {
+          await _audioQuery.scanMedia(filePath);
+        } catch (e) {
+          _logError('Media scan failed for $filePath: $e');
+        }
       }
 
       return filePath;

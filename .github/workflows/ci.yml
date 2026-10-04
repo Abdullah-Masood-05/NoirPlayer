@@ -42,7 +42,7 @@ concurrency:
 
 env:
   # Last 3.35.x stable (Dart 3.9.2): satisfies pubspec `sdk: ^3.9.0` and the
-  # lockfile's `flutter: ">=3.35.0"`, same minor as the iOS workflow.
+  # lockfile's `flutter: ">=3.35.0"`. Keep ios.yml on the same version.
   FLUTTER_VERSION: '3.35.7'
   JAVA_VERSION: '17'
 

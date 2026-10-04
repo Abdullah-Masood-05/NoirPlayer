@@ -1,0 +1,278 @@
+# -----------------------------------------------------------------------------
+# Noir Player — iOS build workflow (macOS runners)
+#
+# Produces an iOS IPA and uploads it as a GitHub Actions artifact.
+#   - Unsigned by default (no Apple secrets needed): builds with --no-codesign.
+#   - Signed when Apple signing secrets are provided (see docs/iOS_BUILD_GUIDE.md).
+# No other secrets are needed: Discover is configured at runtime, not at build
+# time.
+#
+# TRIGGERS
+#   push / pull_request / workflow_dispatch / v* tags
+#   On a v* tag the IPA is attached to the GitHub release that release.yml
+#   creates for that tag (upload only; title and notes are left untouched).
+#   NOTE: GitHub Actions workflows run from the pushed branch (not only main).
+#   The only main-branch quirk is the manual "Run workflow" UI button — it
+#   only appears once this file is on the default branch. On a feature branch
+#   use: gh workflow run ios.yml --ref <branch>
+# -----------------------------------------------------------------------------
+name: Build iOS IPA
+
+on:
+  push:
+    branches:
+      - main
+      - 'feat/**'
+      - 'ci/**'
+    tags:
+      - 'v*'
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      signing_enabled:
+        description: 'Sign the IPA (requires Apple secrets). Off = unsigned build.'
+        type: boolean
+        required: false
+        default: false
+      export_method:
+        description: 'Export method for signed builds'
+        type: choice
+        options:
+          - app-store-connect
+          - ad-hoc
+          - development
+          - enterprise
+        default: app-store-connect
+      build_number:
+        description: 'Override the iOS build number (CFBundleVersion). Leave empty to use pubspec version.'
+        type: string
+        required: false
+        default: ''
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-ios:
+    name: Build iOS IPA
+    runs-on: macos-latest
+    timeout-minutes: 60
+    outputs:
+      signing_enabled: ${{ steps.mode.outputs.value }}
+    env:
+      # Signed when the manual input is on, OR the repo variable is 'true'.
+      SIGNING_ENABLED: ${{ inputs.signing_enabled == true || vars.IOS_SIGNING_ENABLED == 'true' }}
+      EXPORT_METHOD: ${{ inputs.export_method || 'app-store-connect' }}
+      BUILD_NUMBER: ${{ inputs.build_number }}
+      IOS_BUNDLE_ID: ${{ secrets.IOS_BUNDLE_ID }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Keep in step with FLUTTER_VERSION in ci.yml.
+      - name: Set up Flutter 3.35.7 (stable)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.35.7'
+          cache: true
+
+      - name: Verify Flutter
+        run: flutter --version
+
+      - name: Set build mode (exposed to the release job)
+        id: mode
+        run: echo "value=${{ env.SIGNING_ENABLED }}" >> "$GITHUB_OUTPUT"
+
+      - name: Bootstrap iOS platform folder (generate + configure)
+        run: bash ./.github/scripts/ios_bootstrap.sh
+        env:
+          IOS_BUNDLE_ID: ${{ secrets.IOS_BUNDLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          EXPORT_METHOD: ${{ inputs.export_method || 'app-store-connect' }}
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Generate iOS launcher icons
+        run: dart run flutter_launcher_icons
+
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: |
+            ios/Pods
+            ~/.cocoapods
+          key: cocoapods-${{ runner.os }}-${{ hashFiles('ios/Podfile', 'pubspec.yaml', 'pubspec.lock') }}
+          restore-keys: |
+            cocoapods-${{ runner.os }}-
+
+      - name: Install CocoaPods dependencies
+        run: |
+          command -v pod >/dev/null 2>&1 || sudo gem install cocoapods
+          cd ios
+          pod install
+
+      # ---------------------------------------------------------------- signing
+      - name: Check Apple signing secrets (signed build only)
+        if: env.SIGNING_ENABLED == 'true'
+        shell: bash
+        env:
+          APPLE_CERT_P12_BASE64: ${{ secrets.APPLE_CERT_P12_BASE64 }}
+          APPLE_PROVISIONING_PROFILE_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          set -euo pipefail
+          missing=()
+          for s in APPLE_CERT_P12_BASE64 APPLE_PROVISIONING_PROFILE_BASE64 APPLE_TEAM_ID IOS_BUNDLE_ID; do
+            if [ -z "${!s:-}" ]; then missing+=("$s"); fi
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::A signed build was requested but these GitHub Secrets are missing/unset: ${missing[*]}"
+            echo "::error::Create them in Settings > Secrets and variables > Actions. See docs/iOS_BUILD_GUIDE.md."
+            exit 1
+          fi
+          echo "All required Apple signing secrets are present."
+
+      - name: Install Apple signing certificate
+        if: env.SIGNING_ENABLED == 'true'
+        shell: bash
+        env:
+          APPLE_CERT_P12_BASE64: ${{ secrets.APPLE_CERT_P12_BASE64 }}
+          APPLE_CERT_P12_PASSWORD: ${{ secrets.APPLE_CERT_P12_PASSWORD }}
+        run: |
+          set -euo pipefail
+          RUNNER_TEMP="${RUNNER_TEMP:-$TMPDIR}"
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain"
+          CERT_FILE="$RUNNER_TEMP/apple_distribution.p12"
+
+          # 1) Decode the base64-encoded .p12 signing certificate.
+          echo "$APPLE_CERT_P12_BASE64" | base64 -d > "$CERT_FILE"
+
+          # 2) Create a throwaway keychain for this job.
+          security create-keychain -p build "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p build "$KEYCHAIN_PATH"
+
+          # 3) Import the certificate (password optional if the .p12 is unencrypted).
+          if [ -n "${APPLE_CERT_P12_PASSWORD:-}" ]; then
+            security import "$CERT_FILE" -P "$APPLE_CERT_P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          else
+            security import "$CERT_FILE" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          fi
+
+          # 4) Make codesign able to use the key without a UI prompt.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k build "$KEYCHAIN_PATH" >/dev/null 2>&1 || true
+
+          echo "Certificate installed into $KEYCHAIN_PATH"
+
+      - name: Install Apple provisioning profile(s)
+        if: env.SIGNING_ENABLED == 'true'
+        shell: bash
+        env:
+          APPLE_PROVISIONING_PROFILE_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          set -euo pipefail
+          PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$PROFILES_DIR"
+          echo "$APPLE_PROVISIONING_PROFILE_BASE64" | base64 -d > "$PROFILES_DIR/noirplayer.mobileprovision"
+          echo "Installed provisioning profile: $(ls -1 "$PROFILES_DIR")"
+
+      # ------------------------------------------------------------------ build
+      - name: Build unsigned .app (no codesign)
+        if: env.SIGNING_ENABLED != 'true'
+        run: flutter build ios --release --no-codesign
+
+      - name: Package unsigned IPA from .app
+        if: env.SIGNING_ENABLED != 'true'
+        run: |
+          set -euo pipefail
+          APP_DIR="build/ios/iphoneos/Runner.app"
+          if [ ! -d "$APP_DIR" ]; then
+            echo "::error::$APP_DIR not found — the unsigned build failed above." >&2
+            exit 1
+          fi
+          cd build/ios/iphoneos
+          ditto -c -k --sequesterRsrc --keepParent Runner.app NoirPlayer-unsigned.ipa
+          ls -lh NoirPlayer-unsigned.ipa
+
+      - name: Build signed IPA
+        if: env.SIGNING_ENABLED == 'true'
+        run: |
+          set -euo pipefail
+          args=(ipa --release --export-method "$EXPORT_METHOD" --export-options-plist ios/ExportOptions.plist)
+          if [ -n "${BUILD_NUMBER:-}" ]; then
+            args+=(--build-number "$BUILD_NUMBER")
+          fi
+          flutter build "${args[@]}"
+
+      # ----------------------------------------------------------------- artifact
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: noir-player-ios-${{ github.sha }}
+          if-no-files-found: error
+          path: |
+            build/ios/**/*.ipa
+            build/ios/iphoneos/Runner.app
+
+  # ---------------------------------------------------------------------- release
+  # Runs only when a version tag (e.g. v1.1.3) is pushed, after the build above
+  # has finished. The release itself (title, notes, APK) is created by the
+  # Release workflow (release.yml); this job only waits for it and uploads the
+  # IPA to it. It never creates the release and never edits its title or notes.
+  publish-release:
+    name: Attach IPA to GitHub release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build-ios
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    env:
+      SIGNING_ENABLED: ${{ needs.build-ios.outputs.signing_enabled }}
+      TAG: ${{ github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Download IPA artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: noir-player-ios-${{ github.sha }}
+          path: release
+
+      - name: Name the IPA for the release
+        run: |
+          set -euo pipefail
+          ipa="$(find release -name '*.ipa' -type f | head -n 1)"
+          if [ -z "$ipa" ]; then
+            echo "::error::No .ipa found in the build artifact." >&2
+            exit 1
+          fi
+          if [ "$SIGNING_ENABLED" = "true" ]; then
+            name="NoirPlayer-${TAG}-ios.ipa"
+          else
+            name="NoirPlayer-${TAG}-ios-unsigned.ipa"
+          fi
+          mkdir -p dist
+          cp "$ipa" "dist/$name"
+          ls -l dist
+
+      - name: Wait for the release created by release.yml
+        run: |
+          set -euo pipefail
+          # The Android release usually finishes first; poll for up to ~45 min.
+          for i in $(seq 1 90); do
+            if gh release view "$TAG" >/dev/null 2>&1; then
+              echo "Release $TAG found."
+              exit 0
+            fi
+            echo "Release $TAG not published yet (check $i/90); waiting 30s..."
+            sleep 30
+          done
+          echo "::error::No GitHub release exists for $TAG. It is created by the Release workflow (release.yml); once it exists, re-run this job. The IPA is still available as a workflow artifact."
+          exit 1
+
+      - name: Upload IPA to the release
+        run: gh release upload "$TAG" dist/*.ipa --clobber
