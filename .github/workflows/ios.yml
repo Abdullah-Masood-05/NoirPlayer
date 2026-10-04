@@ -8,13 +8,13 @@
 # time.
 #
 # TRIGGERS
-#   push (main, feat/**, ci/**) / pull_request / workflow_dispatch
+#   push (every branch; tags do not trigger it) / pull_request / workflow_dispatch
 #   Every run uploads the artifact `noir-player-ios-<commit sha>` (kept for
 #   30 days). Releases reuse it: when a `v*` tag is pushed, release.yml finds
 #   the successful push run of this workflow for the tagged commit and
 #   attaches its IPA to the release, so tags do not trigger another macOS
-#   build. If the tagged commit has no green run here (e.g. it was pushed to
-#   another branch), run this workflow on the tag first:
+#   build. If the tagged commit has no green run here (e.g. its artifact
+#   expired), run this workflow on the tag first:
 #     gh workflow run ios.yml --ref v<version>
 #   NOTE: GitHub Actions workflows run from the pushed branch (not only main).
 #   The only main-branch quirk is the manual "Run workflow" UI button — it
@@ -25,10 +25,7 @@ name: Build iOS IPA
 
 on:
   push:
-    branches:
-      - main
-      - 'feat/**'
-      - 'ci/**'
+    branches: ["**"]
   pull_request:
   workflow_dispatch:
     inputs:
