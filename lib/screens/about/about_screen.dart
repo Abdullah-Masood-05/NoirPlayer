@@ -1,11 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../core/theme/app_theme.dart';
 
-class AboutScreen extends StatelessWidget {
+/// "Version 1.2.0 (6)" from the build's version name and build number; the
+/// build number is left out when it is empty or the same as the version.
+String formatVersionLabel(String version, String buildNumber) {
+  final name = version.trim();
+  final build = buildNumber.trim();
+  if (name.isEmpty) return build.isEmpty ? 'Version unknown' : 'Build $build';
+  if (build.isEmpty || build == name) return 'Version $name';
+  return 'Version $name ($build)';
+}
+
+class AboutScreen extends StatefulWidget {
   const AboutScreen({super.key});
 
-  static const String _version = '1.1.3';
+  @override
+  State<AboutScreen> createState() => _AboutScreenState();
+}
+
+class _AboutScreenState extends State<AboutScreen> {
+  // Read from the installed package (pubspec `version`), so it can't drift.
+  late final Future<PackageInfo> _packageInfo = PackageInfo.fromPlatform();
 
   static const List<(IconData, String)> _features = [
     (Icons.library_music, 'Local library with a dedicated Music‑folder tab'),
@@ -62,11 +79,27 @@ class AboutScreen extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Center(
-                child: Text(
-                  'Version $_version',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                  ),
+                child: FutureBuilder<PackageInfo>(
+                  future: _packageInfo,
+                  builder: (context, snapshot) {
+                    final info = snapshot.data;
+                    final String label;
+                    if (info != null) {
+                      label = formatVersionLabel(info.version, info.buildNumber);
+                    } else if (snapshot.hasError) {
+                      label = 'Version unavailable';
+                    } else {
+                      label = 'Version …';
+                    }
+                    return Text(
+                      label,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.6,
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
               const SizedBox(height: 24),
