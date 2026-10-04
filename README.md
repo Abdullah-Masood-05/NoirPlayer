@@ -58,7 +58,7 @@ Noir Player is a small, focused Flutter app that:
 3. **Runs a background audio service**, so playback keeps going when the app is backgrounded or the screen is locked — with the song's title, artist and cover art on the standard media notification, which the lock screen, the Samsung Now Bar and other system media controls pick up.
 4. **Discovers new music** — browse trending tracks and search by name through **Noir Player's server**, the same one the desktop app uses. You can add your own Last.fm, YouTube or RapidAPI keys in **Settings → Discover** if you like.
 5. **Streams & downloads** — preview tracks and save them as MP3 to your device's music folder.
-6. **Tailors playback** — sleep timer, playback speed, resume‑after‑a‑call and more, all in a sectioned Settings page reached from the side drawer.
+6. **Tailors playback** — skip back / forward by your own seek interval, sleep timer, playback speed, resume‑after‑a‑call and more, all in a sectioned Settings page reached from the side drawer.
 
 > 🖥️ **On a computer?** [Noir Player for Desktop](https://github.com/Abdullah-Masood-05/noir-player-desktop-app) is the same player rebuilt in Rust for Windows, macOS and Linux.
 
@@ -75,6 +75,7 @@ Noir Player is a small, focused Flutter app that:
 | ⬇️ **Download** | `music_discovery_service.dart` | Resolves YouTube → MP3 and saves straight into your Music folder, with duplicate‑download protection |
 | 🎚️ **Equalizer** | `equalizer_screen.dart` | Native equalizer bands and presets |
 | ⏱️ **Sleep Timer** | `sleep_timer_service.dart` | Auto‑pause after a chosen duration, with a live countdown |
+| ⏪ **Skip Back / Forward** | `player_screen.dart` | Back / forward buttons that jump by your seek interval (5–60 s or a custom 1–300 s, set in Settings → Playback), also used by the notification, lock screen and headset |
 | ⏩ **Playback Speed** | `audio_handler.dart` | 0.5×–2× without pitch change, persisted |
 | 📞 **Call / interruption handling** | `audio_handler.dart` | Resume after a call via `audio_session` |
 | ⚙️ **Persistent Settings** | `settings_service.dart` | Theme, playback, notification and Discover‑key options saved with `shared_preferences` |
@@ -96,12 +97,13 @@ an Android APK and an iOS build, plus a `SHA256SUMS` file to check your download
 ### Updating from 1.1.x
 
 Version 1.2.0 is signed with a new, permanent release key, so Android won't install it over an earlier
-version. Uninstall the old Noir Player first, then install 1.2.0. Playlists and settings stored on the
-device aren't carried over. Later updates install over 1.2.0 normally.
+version. Uninstall the old Noir Player first, then install 1.2.1. Playlists and settings stored on the
+device aren't carried over. From 1.2.0 on, updates install in place: 1.2.1 installs straight over 1.2.0.
 
 | Version | Notes |
 |---|---|
-| **v1.2.0** | Discover through Noir Player's server, your own keys in Settings → Discover, cleaner now‑playing info on system media controls, unsigned iOS IPA |
+| **v1.2.1** | Skip back / forward buttons on the player, a seek interval of your choice in Settings → Playback, the real version in About, one‑time notification permission for pop‑up players |
+| v1.2.0 | Discover through Noir Player's server, your own keys in Settings → Discover, cleaner now‑playing info on system media controls, unsigned iOS IPA |
 | v1.1.3 | Instant Library tab switching, Back returns to Library |
 | v1.1.2 | Reliable downloads into your Music folder, choose the download folder |
 | v1.1.1 | Native equalizer (bands + presets) |
