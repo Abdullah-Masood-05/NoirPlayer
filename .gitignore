@@ -1,6 +1,11 @@
 # Environment / secrets — keep real API keys out of version control
 .env
 
+# Android release signing (never commit keystores or their passwords)
+android/key.properties
+*.jks
+*.keystore
+
 # Miscellaneous
 *.class
 *.log

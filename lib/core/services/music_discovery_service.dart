@@ -1,15 +1,13 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:dio/dio.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:on_audio_query/on_audio_query.dart' show OnAudioQuery;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/discovered_track.dart';
+import 'discover_api.dart';
 import 'settings_service.dart';
 
 /// Outcome of a download attempt.
@@ -28,10 +26,18 @@ class MusicDiscoveryService {
   factory MusicDiscoveryService() => _instance;
   MusicDiscoveryService._internal();
 
-  // API keys are loaded from the .env file (see .env.example) via flutter_dotenv.
-  final String lastFmApiKey = dotenv.env['LASTFM_API_KEY'] ?? '';
-  final String youtubeApiKey = dotenv.env['YOUTUBE_API_KEY'] ?? '';
-  final String rapidApiKey = dotenv.env['RAPIDAPI_KEY'] ?? '';
+  /// Discover's requests. Reads the keys from Settings on every call, so a
+  /// key entered or cleared there applies straight away.
+  final DiscoverApi _api = DiscoverApi(keys: _savedKeys);
+
+  static DiscoverKeys _savedKeys() {
+    final settings = SettingsService.instance;
+    return DiscoverKeys(
+      lastFm: settings.lastFmApiKey,
+      youtube: settings.youtubeApiKey,
+      rapidApi: settings.rapidApiKey,
+    );
+  }
 
   /// Used to register freshly downloaded files with the media library so they
   /// appear in the Library/Music tab (and other apps) immediately.
@@ -50,173 +56,27 @@ class MusicDiscoveryService {
   String trackKey(DiscoveredTrack track) => '${track.name}-${track.artist}';
 
   // ---------------------------------------------------------------------------
-  // Discovery (Last.fm / YouTube / RapidAPI)
+  // Discovery (Last.fm / YouTube / audio service)
+  //
+  // Each service is called directly when the user has entered their own key
+  // for it in Settings, and through Noir Player's backend otherwise. Failures
+  // throw a [DiscoverException] whose message is meant to be shown as-is.
   // ---------------------------------------------------------------------------
 
-  /// Fetch album artwork from Last.fm.
-  Future<String> fetchAlbumArt(String track, String artist) async {
-    final uri = Uri.https('ws.audioscrobbler.com', '/2.0/', {
-      'method': 'track.getInfo',
-      'api_key': lastFmApiKey,
-      'artist': artist,
-      'track': track,
-      'format': 'json',
-    });
+  /// Trending tracks.
+  Future<List<DiscoveredTrack>> fetchTrendingTracks() => _api.fetchTrending();
 
-    try {
-      final response = await http.get(uri);
-      if (response.statusCode != 200) return '';
-      final data = jsonDecode(response.body);
+  /// Search for tracks.
+  Future<List<DiscoveredTrack>> searchTracks(String query) =>
+      _api.search(query);
 
-      final images = data['track']?['album']?['image'];
-      if (images is List) {
-        // Pick the largest available image.
-        for (final img in images.reversed) {
-          final text = img is Map ? img['#text'] : null;
-          if (text is String && text.isNotEmpty) return text;
-        }
-      }
-    } catch (e) {
-      _logError('No album image found for $track - $artist: $e');
-    }
-    return ''; // fallback if no image
-  }
+  /// The id of the YouTube video that best matches the track.
+  Future<String> fetchYoutubeVideoId(String trackName, String artistName) =>
+      _api.findVideoId(trackName, artistName);
 
-  /// Fetch trending tracks from Last.fm.
-  Future<List<DiscoveredTrack>> fetchTrendingTracks() async {
-    final uri = Uri.https('ws.audioscrobbler.com', '/2.0/', {
-      'method': 'geo.gettoptracks',
-      'country': 'pakistan',
-      'api_key': lastFmApiKey,
-      'format': 'json',
-    });
-
-    final response = await http.get(uri);
-    final data = jsonDecode(response.body);
-    final tracks = data['tracks']?['track'];
-    if (tracks is! List) return [];
-
-    final trackFutures = tracks.map<Future<DiscoveredTrack>>((t) async {
-      final trackName = (t['name'] ?? '').toString();
-      final artistName = (t['artist']?['name'] ?? 'Unknown Artist').toString();
-
-      final realImageUrl = await fetchAlbumArt(trackName, artistName);
-
-      return DiscoveredTrack(
-        name: trackName,
-        artist: artistName,
-        imageUrl: realImageUrl.isNotEmpty
-            ? realImageUrl
-            : _fallbackImage(t['image']),
-      );
-    }).toList();
-
-    return await Future.wait(trackFutures);
-  }
-
-  /// Search for tracks on Last.fm.
-  Future<List<DiscoveredTrack>> searchTracks(String query) async {
-    if (query.trim().isEmpty) return [];
-
-    final uri = Uri.https('ws.audioscrobbler.com', '/2.0/', {
-      'method': 'track.search',
-      'track': query,
-      'api_key': lastFmApiKey,
-      'format': 'json',
-    });
-
-    final response = await http.get(uri);
-    final data = jsonDecode(response.body);
-    final tracksData = data['results']?['trackmatches']?['track'];
-    if (tracksData == null) return [];
-
-    final tracksList = tracksData is List ? tracksData : [tracksData];
-
-    final futures = tracksList.map<Future<DiscoveredTrack>>((t) async {
-      final trackName = (t['name'] ?? '').toString();
-      final artistName = (t['artist'] ?? 'Unknown Artist').toString();
-      final realImageUrl = await fetchAlbumArt(trackName, artistName);
-
-      return DiscoveredTrack(
-        name: trackName,
-        artist: artistName,
-        imageUrl: realImageUrl.isNotEmpty
-            ? realImageUrl
-            : _fallbackImage(t['image']),
-      );
-    });
-
-    return await Future.wait(futures);
-  }
-
-  /// Search YouTube for a track and return the first matching video ID.
-  Future<String> fetchYoutubeVideoId(
-    String trackName,
-    String artistName,
-  ) async {
-    final uri = Uri.https('www.googleapis.com', '/youtube/v3/search', {
-      'part': 'snippet',
-      'q': '$trackName $artistName',
-      'type': 'video',
-      'maxResults': '1',
-      'key': youtubeApiKey,
-    });
-
-    try {
-      final response = await http.get(uri);
-      if (response.statusCode != 200) return '';
-      final data = jsonDecode(response.body);
-
-      final items = data['items'];
-      if (items is List && items.isNotEmpty) {
-        return (items[0]['id']?['videoId'] ?? '').toString();
-      }
-    } catch (e) {
-      _logError('Error fetching YouTube video ID: $e');
-    }
-    return '';
-  }
-
-  /// Resolve an MP3 download URL from RapidAPI (youtube-mp36).
-  ///
-  /// The API processes some videos asynchronously, so we poll a few times
-  /// while it reports `processing`.
-  Future<String?> getDownloadUrl(String videoId) async {
-    const maxAttempts = 4;
-
-    for (var attempt = 0; attempt < maxAttempts; attempt++) {
-      try {
-        final uri = Uri.https('youtube-mp36.p.rapidapi.com', '/dl', {
-          'id': videoId,
-        });
-
-        final response = await http.get(
-          uri,
-          headers: {
-            'X-RapidAPI-Key': rapidApiKey,
-            'X-RapidAPI-Host': 'youtube-mp36.p.rapidapi.com',
-          },
-        );
-
-        if (response.statusCode != 200) return null;
-
-        final data = jsonDecode(response.body);
-        final link = data['link']?.toString();
-        if (link != null && link.isNotEmpty) return link;
-
-        final status = data['status']?.toString();
-        if (status == 'processing' && attempt < maxAttempts - 1) {
-          await Future.delayed(const Duration(seconds: 2));
-          continue;
-        }
-        return null;
-      } catch (e) {
-        _logError('Error getting download URL: $e');
-        return null;
-      }
-    }
-    return null;
-  }
+  /// A downloadable audio link for [videoId].
+  Future<String> getDownloadUrl(String videoId) =>
+      _api.resolveAudioLink(videoId);
 
   // ---------------------------------------------------------------------------
   // Download bookkeeping (de-duplication)
@@ -264,6 +124,7 @@ class MusicDiscoveryService {
   Future<DownloadResult> downloadTrack(
     DiscoveredTrack track, {
     void Function(int received, int total)? onProgress,
+    void Function(String message)? onError,
   }) async {
     await loadDownloadedKeys();
     final key = trackKey(track);
@@ -278,11 +139,14 @@ class MusicDiscoveryService {
         return DownloadResult.permissionDenied;
       }
 
-      final videoId = await fetchYoutubeVideoId(track.name, track.artist);
-      if (videoId.isEmpty) return DownloadResult.noSource;
-
-      final mp3Url = await getDownloadUrl(videoId);
-      if (mp3Url == null || mp3Url.isEmpty) return DownloadResult.noSource;
+      final String mp3Url;
+      try {
+        final videoId = await fetchYoutubeVideoId(track.name, track.artist);
+        mp3Url = await getDownloadUrl(videoId);
+      } on DiscoverException catch (e) {
+        onError?.call(e.message);
+        return DownloadResult.noSource;
+      }
 
       final savedUri = await saveFile(
         mp3Url,
@@ -410,15 +274,6 @@ class MusicDiscoveryService {
     if (clean.isEmpty) clean = 'track';
     if (clean.length > 100) clean = clean.substring(0, 100).trim();
     return clean;
-  }
-
-  String _fallbackImage(dynamic images) {
-    if (images is List && images.isNotEmpty) {
-      final last = images.last;
-      final text = last is Map ? last['#text'] : null;
-      if (text is String) return text;
-    }
-    return '';
   }
 
   void _logError(String message) {

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:noir_player/core/services/audio_handler.dart';
 import 'package:noir_player/core/services/playlist_service.dart';
 import 'package:noir_player/core/services/settings_service.dart';
@@ -10,12 +9,6 @@ import 'screens/home/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Load API keys for the Discover/download module. fileName defaults to ".env";
-  // ignore errors so the app still runs if the file is missing.
-  try {
-    await dotenv.load();
-  } catch (_) {}
 
   // Load persisted user settings + playlists before anything reads them.
   await SettingsService.instance.load();

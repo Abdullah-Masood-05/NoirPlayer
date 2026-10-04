@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../core/models/discovered_track.dart';
 import '../../core/services/audio_handler.dart';
+import '../../core/services/discover_api.dart';
 import '../../core/services/music_discovery_service.dart';
 import '../../core/services/settings_service.dart';
 import '../../core/theme/app_theme.dart';
@@ -59,7 +60,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      _showSnack('Error loading trending: $e');
+      _showSnack(_errorText(e, 'Error loading trending'));
     }
   }
 
@@ -82,7 +83,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      _showSnack('Error searching: $e');
+      _showSnack(_errorText(e, 'Error searching'));
     }
   }
 
@@ -94,12 +95,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         track.name,
         track.artist,
       );
-      if (videoId.isEmpty) throw Exception('No source found');
-
       final mp3Url = await _discoveryService.getDownloadUrl(videoId);
-      if (mp3Url == null || mp3Url.isEmpty) {
-        throw Exception('No stream URL found');
-      }
 
       // Play through the main player so it shows in the player / mini-player /
       // notification and is fully controllable.
@@ -116,7 +112,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _loadingTrack = null);
-      _showSnack('Error playing track: $e');
+      _showSnack(_errorText(e, 'Error playing track'));
     }
   }
 
@@ -129,6 +125,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     if (_downloadProgress.containsKey(key)) return;
 
     setState(() => _downloadProgress[key] = 0.0);
+    String? errorMessage;
     final result = await _discoveryService.downloadTrack(
       track,
       onProgress: (received, total) {
@@ -136,6 +133,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           setState(() => _downloadProgress[key] = received / total);
         }
       },
+      onError: (message) => errorMessage = message,
     );
     if (!mounted) return;
     setState(() => _downloadProgress.remove(key));
@@ -150,7 +148,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         _showSnack('${track.name} is already downloaded');
         break;
       case DownloadResult.noSource:
-        _showSnack('No downloadable source found for ${track.name}');
+        _showSnack(
+          errorMessage ?? 'No downloadable source found for ${track.name}',
+        );
         break;
       case DownloadResult.failed:
         _showSnack('Failed to download ${track.name}');
@@ -165,6 +165,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         break;
     }
   }
+
+  /// Discover errors carry a message meant for the user; show it as-is.
+  String _errorText(Object error, String fallback) =>
+      error is DiscoverException ? error.message : '$fallback: $error';
 
   void _showSnack(String message) {
     if (!mounted) return;

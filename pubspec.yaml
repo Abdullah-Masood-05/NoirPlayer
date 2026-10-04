@@ -42,7 +42,6 @@ dependencies:
   http: ^1.1.0
   dio: ^5.2.0
   path_provider: ^2.1.2
-  flutter_dotenv: ^5.1.0
   flutter_animate: ^4.5.0
 
   # The following adds the Cupertino Icons font to your application.
@@ -84,10 +83,6 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
-
-  # API keys for the Discover/download module are loaded from this file at runtime.
-  assets:
-    - .env
 
   # To add assets to your application, add an assets section, like this:
   # assets:

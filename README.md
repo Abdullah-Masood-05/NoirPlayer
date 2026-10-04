@@ -37,7 +37,7 @@
 - [🚀 Getting Started](#-getting-started)
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
-  - [🔑 Environment Setup (API Keys)](#-environment-setup-api-keys)
+  - [🔑 Discover Setup](#-discover-setup)
   - [Running the App](#running-the-app)
 - [🧭 How It Works](#-how-it-works)
 - [🛠️ Architecture](#️-architecture)
@@ -106,7 +106,7 @@ from scratch in **Rust** with **GPUI Kit** rather than Flutter.
 | **Library** | Device audio via `on_audio_query` | Folder scanning, sorted A→Z under letter headings |
 | **Playback** | Background service, notification & lock‑screen controls | Desktop transport bar, click‑to‑seek, queue rail |
 | **Extras** | Sleep timer, playback speed | 5‑band equalizer, embedded lyrics, in‑app updates |
-| **Discover** | Last.fm search, YouTube → MP3 download | The same services, same keys |
+| **Discover** | Last.fm search, YouTube → MP3 download, through Noir Player's server | The same services, through the same server |
 
 <p>
   <a href="https://github.com/Abdullah-Masood-05/noir-player-desktop-app/releases/latest"><b>📥 Download for Windows, macOS or Linux</b></a>
@@ -134,13 +134,14 @@ A **4‑tab bottom bar** plus a **hamburger drawer** for everything else:
 
 ```
 lib/
-├── main.dart                      # App entry — loads .env + settings, inits audio service
+├── main.dart                      # App entry — loads settings, inits audio service
 ├── core/
 │   ├── models/
 │   │   ├── playlist_model.dart
 │   │   └── discovered_track.dart        # Discover/download track model
 │   ├── services/
 │   │   ├── audio_handler.dart           # Background audio, media controls, interruptions
+│   │   ├── discover_api.dart            # Discover requests: Noir Player's server or your own keys
 │   │   ├── music_discovery_service.dart # Last.fm + YouTube + MP3 download
 │   │   ├── settings_service.dart        # Persisted user preferences
 │   │   └── sleep_timer_service.dart     # Auto‑stop timer
@@ -183,33 +184,24 @@ cd NoirPlayer
 flutter pub get
 ```
 
-### 🔑 Environment Setup (API Keys)
+### 🔑 Discover Setup
 
-The **Discover / download** module needs API keys. They are loaded at runtime from a
-`.env` file (via [`flutter_dotenv`](https://pub.dev/packages/flutter_dotenv)) and are
-**never committed** — `.env` is in `.gitignore`.
+Discover works out of the box: trending tracks, search, YouTube lookups and MP3
+resolution all run through **Noir Player's server** (`https://noir-player-api.vercel.app`),
+the same one the desktop app uses. There is nothing to configure.
 
-1. Copy the template:
+If you have API keys of your own, you can add them in **Settings → Discover**. Any service
+you enter a key for is called directly with your key; the others keep going through
+Noir Player's server. Keys are stored on your device only, and clearing a field switches
+that service back to the server.
 
-   ```bash
-   cp .env.example .env
-   ```
+| Setting | Get a key from |
+|---|---|
+| Last.fm API key | https://www.last.fm/api/account/create |
+| YouTube Data API key | https://console.cloud.google.com/apis/credentials (YouTube Data API v3) |
+| RapidAPI key | https://rapidapi.com/ (subscribe to the **youtube-mp36** API) |
 
-2. Fill in your keys in `.env`:
-
-   ```dotenv
-   LASTFM_API_KEY=your_lastfm_key
-   YOUTUBE_API_KEY=your_youtube_data_api_v3_key
-   RAPIDAPI_KEY=your_rapidapi_key
-   ```
-
-   | Key | Get it from |
-   |---|---|
-   | `LASTFM_API_KEY` | https://www.last.fm/api/account/create |
-   | `YOUTUBE_API_KEY` | https://console.cloud.google.com/apis/credentials |
-   | `RAPIDAPI_KEY` | https://rapidapi.com/ (subscribe to the **youtube-mp36** API) |
-
-> 💡 Without keys, the rest of the app (local library + playback) still works — only the Discover tab needs them.
+> 💡 The rest of the app (local library + playback) works offline; only the Discover tab needs a connection.
 
 ### Running the App
 
@@ -226,7 +218,7 @@ flutter run -d android
 ```
 ┌─────────────────────┐     init      ┌──────────────────────┐
 │   main.dart          │ ───────────▶ │  AudioHandler        │
-│ (loads .env + audio) │              │ (audio_service)      │
+│ (settings + audio)   │              │ (audio_service)      │
 └──────────┬──────────┘              └──────────────────────┘
            │
            ▼
@@ -243,8 +235,9 @@ flutter run -d android
 ```
 
 **Download flow:** pick a track → look up its YouTube video ID → resolve an MP3 URL
-(RapidAPI) → stream-download with `dio` (with progress) → save to the device's Music
-folder via `media_store_plus`.
+(RapidAPI) → stream-download the MP3 straight from that link with `dio` (with progress) →
+save to the device's Music folder. The lookup and resolve steps run through Noir Player's
+server, or directly with your own key for any service you added one for in Settings.
 
 ---
 
@@ -252,10 +245,11 @@ folder via `media_store_plus`.
 
 | File | Responsibility |
 |---|---|
-| `main.dart` | Loads `.env`, initialises the audio service, sets up theming & routes |
+| `main.dart` | Loads settings, initialises the audio service, sets up theming & routes |
 | `audio_handler.dart` | Wraps `audio_service` + `just_audio` for background playback and notifications |
 | `library_screen.dart` | Tabbed local library using `on_audio_query` |
 | `discover_screen.dart` | Discover UI — search, trending, preview-play, and per-track download progress |
+| `discover_api.dart` | Discover requests and response parsing — Noir Player's server, or each service directly with your own key |
 | `music_discovery_service.dart` | Last.fm metadata, YouTube lookup, RapidAPI MP3 resolution, and file saving |
 | `player_screen.dart` | Reactive "Now Playing" bound to the audio service streams |
 
@@ -273,7 +267,6 @@ folder via `media_store_plus`.
 | [`provider`](https://pub.dev/packages/provider) · [`shared_preferences`](https://pub.dev/packages/shared_preferences) | State & persistence |
 | [`http`](https://pub.dev/packages/http) · [`dio`](https://pub.dev/packages/dio) | Networking & file download |
 | [`media_store_plus`](https://pub.dev/packages/media_store_plus) · [`path_provider`](https://pub.dev/packages/path_provider) | Saving downloads to device storage |
-| [`flutter_dotenv`](https://pub.dev/packages/flutter_dotenv) | Loading API keys from `.env` |
 
 > Run `flutter pub get` to install everything declared in `pubspec.yaml`.
 

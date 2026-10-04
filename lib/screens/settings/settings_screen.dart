@@ -131,6 +131,50 @@ class SettingsScreen extends StatelessWidget {
                   onTap: () => showSleepTimerSheet(context),
                 ),
               ),
+              const Divider(height: 1),
+
+              _SectionHeader('Discover'),
+              const ListTile(
+                leading: Icon(Icons.cloud_outlined),
+                title: Text("Runs through Noir Player's server"),
+                subtitle: Text(
+                  'Optionally add your own keys below. A service with a key '
+                  'is called directly with it.',
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.key_outlined),
+                title: const Text('Last.fm API key'),
+                subtitle: Text(_keyStatus(settings.lastFmApiKey)),
+                onTap: () => _editApiKey(
+                  context,
+                  title: 'Last.fm API key',
+                  current: settings.lastFmApiKey,
+                  save: settings.setLastFmApiKey,
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.key_outlined),
+                title: const Text('YouTube Data API key'),
+                subtitle: Text(_keyStatus(settings.youtubeApiKey)),
+                onTap: () => _editApiKey(
+                  context,
+                  title: 'YouTube Data API key',
+                  current: settings.youtubeApiKey,
+                  save: settings.setYoutubeApiKey,
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.key_outlined),
+                title: const Text('RapidAPI key'),
+                subtitle: Text(_keyStatus(settings.rapidApiKey)),
+                onTap: () => _editApiKey(
+                  context,
+                  title: 'RapidAPI key',
+                  current: settings.rapidApiKey,
+                  save: settings.setRapidApiKey,
+                ),
+              ),
             ],
           );
         },
@@ -198,6 +242,23 @@ class SettingsScreen extends StatelessWidget {
     await settings.setMusicFolderPath(selected.isEmpty ? null : selected);
   }
 
+  String _keyStatus(String key) => key.isEmpty
+      ? "Not set • uses Noir Player's server"
+      : 'Your key • called directly';
+
+  Future<void> _editApiKey(
+    BuildContext context, {
+    required String title,
+    required String current,
+    required Future<void> Function(String key) save,
+  }) async {
+    final value = await showDialog<String>(
+      context: context,
+      builder: (ctx) => _ApiKeyDialog(title: title, initialValue: current),
+    );
+    if (value != null) await save(value);
+  }
+
   Future<void> _pickSeekInterval(
     BuildContext context,
     SettingsService settings,
@@ -246,6 +307,70 @@ class _SectionHeader extends StatelessWidget {
           color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55),
         ),
       ),
+    );
+  }
+}
+
+/// Edits one service key. The key is hidden unless the user chooses to show
+/// it. Pops with the entered text, '' to clear, or null on cancel.
+class _ApiKeyDialog extends StatefulWidget {
+  const _ApiKeyDialog({required this.title, required this.initialValue});
+
+  final String title;
+  final String initialValue;
+
+  @override
+  State<_ApiKeyDialog> createState() => _ApiKeyDialogState();
+}
+
+class _ApiKeyDialogState extends State<_ApiKeyDialog> {
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.initialValue,
+  );
+  bool _obscured = true;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        obscureText: _obscured,
+        autocorrect: false,
+        enableSuggestions: false,
+        decoration: InputDecoration(
+          hintText: 'Paste your key',
+          helperText: "Leave empty to use Noir Player's server",
+          helperMaxLines: 2,
+          suffixIcon: IconButton(
+            tooltip: _obscured ? 'Show key' : 'Hide key',
+            icon: Icon(_obscured ? Icons.visibility : Icons.visibility_off),
+            onPressed: () => setState(() => _obscured = !_obscured),
+          ),
+        ),
+        onSubmitted: (value) => Navigator.pop(context, value),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, ''),
+          child: const Text('Clear'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, _controller.text),
+          child: const Text('Save'),
+        ),
+      ],
     );
   }
 }

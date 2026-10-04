@@ -41,6 +41,14 @@ class SettingsService extends ChangeNotifier {
   bool equalizerEnabled = false;
   List<double> equalizerBandGains = const [];
 
+  // ── Discover ─────────────────────────────────────────────────────────────
+  /// The user's own service keys. A service with a key here is called
+  /// directly with it; the others go through Noir Player's server. Empty =
+  /// not set.
+  String lastFmApiKey = '';
+  String youtubeApiKey = '';
+  String rapidApiKey = '';
+
   // ── Keys ─────────────────────────────────────────────────────────────────
   static const _kTheme = 'settings.themeMode';
   static const _kResumeAfterCall = 'settings.resumeAfterCall';
@@ -52,6 +60,9 @@ class SettingsService extends ChangeNotifier {
   static const _kMusicFolder = 'settings.musicFolderPath';
   static const _kEqEnabled = 'settings.equalizerEnabled';
   static const _kEqGains = 'settings.equalizerBandGains';
+  static const _kLastFmApiKey = 'settings.lastFmApiKey';
+  static const _kYoutubeApiKey = 'settings.youtubeApiKey';
+  static const _kRapidApiKey = 'settings.rapidApiKey';
 
   Future<void> load() async {
     final prefs = _prefs = await SharedPreferences.getInstance();
@@ -67,6 +78,9 @@ class SettingsService extends ChangeNotifier {
     equalizerBandGains = (prefs.getStringList(_kEqGains) ?? const [])
         .map((g) => double.tryParse(g) ?? 0.0)
         .toList();
+    lastFmApiKey = prefs.getString(_kLastFmApiKey) ?? '';
+    youtubeApiKey = prefs.getString(_kYoutubeApiKey) ?? '';
+    rapidApiKey = prefs.getString(_kRapidApiKey) ?? '';
   }
 
   /// A short display label for the chosen music folder.
@@ -155,6 +169,35 @@ class SettingsService extends ChangeNotifier {
       gains.map((g) => g.toString()).toList(),
     );
     notifyListeners();
+  }
+
+  /// Pass an empty string to clear the key.
+  Future<void> setLastFmApiKey(String key) async {
+    lastFmApiKey = key.trim();
+    await _saveKey(_kLastFmApiKey, lastFmApiKey);
+    notifyListeners();
+  }
+
+  /// Pass an empty string to clear the key.
+  Future<void> setYoutubeApiKey(String key) async {
+    youtubeApiKey = key.trim();
+    await _saveKey(_kYoutubeApiKey, youtubeApiKey);
+    notifyListeners();
+  }
+
+  /// Pass an empty string to clear the key.
+  Future<void> setRapidApiKey(String key) async {
+    rapidApiKey = key.trim();
+    await _saveKey(_kRapidApiKey, rapidApiKey);
+    notifyListeners();
+  }
+
+  Future<void> _saveKey(String prefsKey, String value) async {
+    if (value.isEmpty) {
+      await _prefs?.remove(prefsKey);
+    } else {
+      await _prefs?.setString(prefsKey, value);
+    }
   }
 
   ThemeMode _themeFromName(String? name) {
