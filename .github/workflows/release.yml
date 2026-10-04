@@ -241,33 +241,69 @@ jobs:
 
       - name: Require release signing
         run: |
-          set -euo pipefail
+          # Every failure path below prints an ::error:: with the reason; no
+          # command is allowed to end the step silently.
+          set -uo pipefail
           apk=build-apk/app-release.apk
-          test -s "$apk"
-          apksigner="$(ls -d "${ANDROID_HOME:-/usr/local/lib/android/sdk}"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -n 1)"
-          if [ -z "$apksigner" ]; then
-            echo "::error::apksigner was not found in the Android SDK on this runner, so the APK signature cannot be checked."
+          if [ ! -s "$apk" ]; then
+            echo "::error::$apk is missing or empty in the CI artifact. Contents of build-apk:"
+            ls -laR build-apk || true
             exit 1
           fi
-          certs="$("$apksigner" verify --print-certs "$apk")"
-          echo "$certs" | grep -E '^Signer #1 certificate (DN|SHA-256)'
-          dn="$(echo "$certs" | sed -n 's/^Signer #1 certificate DN: //p')"
-          digest="$(echo "$certs" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | tr -d ': ' | tr 'A-F' 'a-f')"
 
-          if printf '%s' "$dn" | grep -q 'CN=Android Debug'; then
-            if [ "$ALLOW_DEBUG_SIGNED" = "true" ]; then
+          sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          # Newest build-tools wins (an unmatched glob stays literal and fails -x).
+          apksigner="$(printf '%s\n' "$sdk"/build-tools/*/apksigner | sort -V | tail -n 1)"
+          if [ -z "$apksigner" ] || [ ! -x "$apksigner" ]; then
+            echo "::error::apksigner was not found under $sdk/build-tools on this runner, so the APK signature cannot be checked."
+            exit 1
+          fi
+          echo "Using $apksigner"
+
+          status=0
+          out="$("$apksigner" verify --print-certs "$apk" 2>&1)" || status=$?
+          echo "----- apksigner verify --print-certs -----"
+          printf '%s\n' "$out"
+          echo "----- exit status: $status -----"
+          if [ "$status" -ne 0 ]; then
+            echo "::error::apksigner verify failed (exit status $status) for $apk; see its output above."
+            exit 1
+          fi
+
+          # apksigner's output format differs between build-tools versions:
+          #   <= 36.x: "Signer #1 certificate DN: ..." / "Signer #1 certificate SHA-256 digest: ..."
+          #   >= 37:   "V2 Signer: certificate DN: ..." / "V2 Signer: certificate SHA-256 digest: ..."
+          # (and "Signer (minSdkVersion=..) ..." for SDK-targeted v3.1 signers).
+          # Accept any "<...Signer...> certificate <field>: <value>" line.
+          signer_re='^[^:]*Signer[^:]*:? certificate'
+          dns="$(printf '%s\n' "$out" | sed -nE "s/${signer_re} DN: //p")"
+          digests="$(printf '%s\n' "$out" | sed -nE "s/${signer_re} SHA-256 digest: //p" | tr -d ': ' | tr 'A-F' 'a-f' | sort -u)"
+          if [ -z "$dns" ] || [ -z "$digests" ]; then
+            echo "::error::Could not read the signing certificate (DN and SHA-256 digest) from apksigner's output above; the output format may have changed."
+            exit 1
+          fi
+          echo "Signer DN(s): $(printf '%s' "$dns" | paste -sd ';' -)"
+          echo "Signer certificate SHA-256: $(printf '%s' "$digests" | paste -sd ' ' -)"
+
+          if printf '%s\n' "$dns" | grep -q 'CN=Android Debug'; then
+            if [ "${ALLOW_DEBUG_SIGNED:-}" = "true" ]; then
               echo "::warning title=Debug-signed release::Publishing a debug-signed APK (ALLOW_DEBUG_SIGNED_RELEASE=true). It will not install as an update over other releases."
-            else
-              echo "::error::The CI build of ${SHA} is signed with the debug key. Set the ANDROID_* signing secrets (see ci.yml), re-run CI on this commit, then re-run this workflow. To publish anyway, set repository variable ALLOW_DEBUG_SIGNED_RELEASE=true."
-              exit 1
+              exit 0
             fi
-          elif [ -n "$EXPECTED_CERT_SHA256" ]; then
+            echo "::error::The CI build of ${SHA} is signed with the debug key. Set the ANDROID_* signing secrets (see ci.yml), re-run CI on this commit, then re-run this workflow. To publish anyway, set repository variable ALLOW_DEBUG_SIGNED_RELEASE=true."
+            exit 1
+          fi
+
+          if [ -n "${EXPECTED_CERT_SHA256:-}" ]; then
             expected="$(printf '%s' "$EXPECTED_CERT_SHA256" | tr -d ': ' | tr 'A-F' 'a-f')"
-            if [ "$digest" != "$expected" ]; then
-              echo "::error::The APK is signed with certificate ${digest}, not the release certificate in ANDROID_RELEASE_CERT_SHA256."
+            # Every signer (v1/v2/v3...) must use the release certificate.
+            if [ "$digests" != "$expected" ]; then
+              echo "::error::The APK is signed with certificate(s) $(printf '%s' "$digests" | paste -sd ' ' -), not the release certificate ${expected} in ANDROID_RELEASE_CERT_SHA256."
               exit 1
             fi
             echo "Signing certificate matches ANDROID_RELEASE_CERT_SHA256."
+          else
+            echo "::notice::ANDROID_RELEASE_CERT_SHA256 is not set; the APK is release-signed (not debug) but its certificate was not pinned."
           fi
 
       - name: Name files and write checksums
