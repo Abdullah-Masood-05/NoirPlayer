@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 
 import '../../core/services/settings_service.dart';
@@ -76,6 +77,16 @@ class SettingsScreen extends StatelessWidget {
                 subtitle: Text(formatSpeed(settings.playbackSpeed)),
                 onTap: () => showPlaybackSpeedSheet(context),
               ),
+              ListTile(
+                leading: const Icon(Icons.timelapse),
+                title: const Text('Seek interval'),
+                subtitle: Text(
+                  '${SettingsService.seekIntervalLabel(settings.seekIntervalSeconds)}'
+                  ' • player buttons, notification / lock screen and '
+                  'headset seek',
+                ),
+                onTap: () => _pickSeekInterval(context, settings),
+              ),
               SwitchListTile(
                 secondary: const Icon(Icons.call),
                 title: const Text('Resume playback after a call'),
@@ -104,16 +115,14 @@ class SettingsScreen extends StatelessWidget {
                 secondary: const Icon(Icons.fast_forward),
                 title: const Text('Seek buttons in notification'),
                 subtitle: const Text(
-                  'Show rewind and fast-forward in media controls',
+                  'Back / forward buttons in the notification and lock '
+                  'screen. Android 13+ shows them only in the expanded media '
+                  'player, and some phones hide them. On iPhone they replace '
+                  'previous / next.',
                 ),
+                isThreeLine: true,
                 value: settings.seekButtonsInNotification,
                 onChanged: settings.setSeekButtonsInNotification,
-              ),
-              ListTile(
-                leading: const Icon(Icons.timelapse),
-                title: const Text('Seek interval'),
-                subtitle: Text('${settings.seekIntervalSeconds} seconds'),
-                onTap: () => _pickSeekInterval(context, settings),
               ),
               const Divider(height: 1),
 
@@ -263,19 +272,23 @@ class SettingsScreen extends StatelessWidget {
     BuildContext context,
     SettingsService settings,
   ) async {
-    const options = [5, 10, 15, 30, 60];
+    // Popped by the "Custom…" entry.
+    const custom = -1;
+    final current = settings.seekIntervalSeconds;
+    final isPreset = SettingsService.seekIntervalPresets.contains(current);
+
     final selected = await showDialog<int>(
       context: context,
       builder: (context) => SimpleDialog(
         title: const Text('Seek interval'),
         children: [
           RadioGroup<int>(
-            groupValue: settings.seekIntervalSeconds,
+            groupValue: current,
             onChanged: (value) => Navigator.pop(context, value),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                for (final seconds in options)
+                for (final seconds in SettingsService.seekIntervalPresets)
                   RadioListTile<int>(
                     title: Text('$seconds seconds'),
                     value: seconds,
@@ -283,10 +296,98 @@ class SettingsScreen extends StatelessWidget {
               ],
             ),
           ),
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+            leading: Icon(isPreset ? Icons.edit_outlined : Icons.check),
+            title: const Text('Custom…'),
+            subtitle: isPreset
+                ? null
+                : Text(SettingsService.seekIntervalLabel(current)),
+            onTap: () => Navigator.pop(context, custom),
+          ),
         ],
       ),
     );
-    if (selected != null) settings.setSeekIntervalSeconds(selected);
+    if (selected == null) return;
+    if (selected != custom) {
+      await settings.setSeekIntervalSeconds(selected);
+      return;
+    }
+
+    if (!context.mounted) return;
+    final seconds = await showDialog<int>(
+      context: context,
+      builder: (context) => _SeekIntervalDialog(initialSeconds: current),
+    );
+    if (seconds != null) await settings.setSeekIntervalSeconds(seconds);
+  }
+}
+
+/// Asks for a custom seek interval (whole seconds within the allowed range).
+/// Pops with the seconds, or null on cancel.
+class _SeekIntervalDialog extends StatefulWidget {
+  const _SeekIntervalDialog({required this.initialSeconds});
+
+  final int initialSeconds;
+
+  @override
+  State<_SeekIntervalDialog> createState() => _SeekIntervalDialogState();
+}
+
+class _SeekIntervalDialogState extends State<_SeekIntervalDialog> {
+  late final TextEditingController _controller = TextEditingController(
+    text: '${widget.initialSeconds}',
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final seconds = SettingsService.parseSeekInterval(_controller.text);
+    if (seconds != null) Navigator.pop(context, seconds);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const min = SettingsService.minSeekIntervalSeconds;
+    const max = SettingsService.maxSeekIntervalSeconds;
+    final text = _controller.text;
+    final valid = SettingsService.parseSeekInterval(text) != null;
+
+    return AlertDialog(
+      title: const Text('Custom seek interval'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        keyboardType: TextInputType.number,
+        inputFormatters: [
+          FilteringTextInputFormatter.digitsOnly,
+          LengthLimitingTextInputFormatter(3),
+        ],
+        decoration: InputDecoration(
+          suffixText: 'seconds',
+          helperText: '$min–$max seconds',
+          errorText: text.isEmpty || valid
+              ? null
+              : 'Enter a number from $min to $max',
+        ),
+        onChanged: (_) => setState(() {}),
+        onSubmitted: (_) => _submit(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: valid ? _submit : null,
+          child: const Text('OK'),
+        ),
+      ],
+    );
   }
 }
 

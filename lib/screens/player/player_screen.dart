@@ -7,6 +7,8 @@ import 'package:just_audio/just_audio.dart' show LoopMode;
 import 'package:on_audio_query/on_audio_query.dart';
 
 import '../../core/services/audio_handler.dart';
+import '../../core/services/settings_service.dart';
+import '../../widgets/seek_button.dart';
 
 class PlayerScreen extends StatefulWidget {
   const PlayerScreen({super.key});
@@ -241,33 +243,57 @@ class _PlayerScreenState extends State<PlayerScreen> {
             ),
             const SizedBox(height: 8),
 
-            // Shuffle · prev · play/pause · next · repeat
-            StreamBuilder<PlaybackState>(
-              stream: audioHandler.playbackState,
-              builder: (context, snapshot) {
-                final playing = snapshot.data?.playing ?? false;
-                return Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _shuffleButton(theme),
-                    _ghostButton(
-                      icon: Icons.skip_previous_rounded,
-                      onPressed: _handler.playPrevious,
-                    ),
-                    _PlayPauseButton(
-                      playing: playing,
-                      color: theme.colorScheme.primary,
-                      onPressed: () =>
-                          playing ? audioHandler.pause() : audioHandler.play(),
-                    ),
-                    _ghostButton(
-                      icon: Icons.skip_next_rounded,
-                      onPressed: _handler.playNext,
-                    ),
-                    _repeatButton(theme),
-                  ],
+            // Back N s · prev · play/pause · next · forward N s
+            ListenableBuilder(
+              listenable: SettingsService.instance,
+              builder: (context, _) {
+                final seekSeconds = SettingsService.instance.seekIntervalSeconds;
+                return StreamBuilder<PlaybackState>(
+                  stream: audioHandler.playbackState,
+                  builder: (context, snapshot) {
+                    final playing = snapshot.data?.playing ?? false;
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        SeekButton(
+                          seconds: seekSeconds,
+                          forward: false,
+                          onPressed: _handler.rewind,
+                        ),
+                        _ghostButton(
+                          icon: Icons.skip_previous_rounded,
+                          onPressed: _handler.playPrevious,
+                        ),
+                        _PlayPauseButton(
+                          playing: playing,
+                          color: theme.colorScheme.primary,
+                          onPressed: () => playing
+                              ? audioHandler.pause()
+                              : audioHandler.play(),
+                        ),
+                        _ghostButton(
+                          icon: Icons.skip_next_rounded,
+                          onPressed: _handler.playNext,
+                        ),
+                        SeekButton(
+                          seconds: seekSeconds,
+                          forward: true,
+                          onPressed: _handler.fastForward,
+                        ),
+                      ],
+                    );
+                  },
                 );
               },
+            ),
+
+            // Shuffle · repeat
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [_shuffleButton(theme), _repeatButton(theme)],
+              ),
             ),
           ],
         ),

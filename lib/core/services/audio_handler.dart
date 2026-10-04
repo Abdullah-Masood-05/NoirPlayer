@@ -10,6 +10,7 @@ import 'package:on_audio_query/on_audio_query.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/playlist_model.dart';
+import 'media_controls.dart';
 import 'settings_service.dart';
 
 late final AudioHandler audioHandler;
@@ -20,7 +21,7 @@ Future<void> initAudioService() async {
 
   audioHandler = await AudioService.init(
     builder: () => AudioPlayerHandler(),
-    config: const AudioServiceConfig(
+    config: AudioServiceConfig(
       androidNotificationChannelId: 'com.example.noir_player.channel.audio',
       androidNotificationChannelName: 'Noir Player',
       // Keep the notification ongoing and the service in the foreground even
@@ -30,8 +31,11 @@ Future<void> initAudioService() async {
       androidNotificationOngoing: true,
       androidShowNotificationBadge: true,
       androidNotificationIcon: 'mipmap/ic_launcher',
-      fastForwardInterval: Duration(seconds: 10),
-      rewindInterval: Duration(seconds: 10),
+      // The seek step comes from Settings. AudioPlayerHandler overrides
+      // fastForward / rewind to read it live; this only seeds the iOS
+      // lock-screen skip buttons, which pick it up on the next launch.
+      fastForwardInterval: SettingsService.instance.seekInterval,
+      rewindInterval: SettingsService.instance.seekInterval,
     ),
   );
 
@@ -109,46 +113,48 @@ class AudioPlayerHandler extends BaseAudioHandler {
     // Reflect loop / shuffle changes in the published state immediately.
     _player.loopModeStream.listen((_) => _broadcastState());
     _player.shuffleModeEnabledStream.listen((_) => _broadcastState());
+
+    // Rebuild the media controls as soon as the seek settings change, not on
+    // the next playback event.
+    SettingsService.instance.addListener(_onSettingsChanged);
   }
 
   // ---------------------------------------------------------------------------
   // Playback state broadcasting
   // ---------------------------------------------------------------------------
 
+  // Seek settings the published controls were last built with.
+  bool? _shownSeekButtons;
+  int? _shownSeekSeconds;
+
+  void _onSettingsChanged() {
+    final settings = SettingsService.instance;
+    if (settings.seekButtonsInNotification != _shownSeekButtons ||
+        settings.seekIntervalSeconds != _shownSeekSeconds) {
+      _broadcastState();
+    }
+  }
+
   void _broadcastState([PlaybackEvent? event]) {
     final playing = _player.playing;
-    final showSeek = SettingsService.instance.seekButtonsInNotification;
+    final settings = SettingsService.instance;
+    _shownSeekButtons = settings.seekButtonsInNotification;
+    _shownSeekSeconds = settings.seekIntervalSeconds;
 
-    // Buttons shown in the notification.
-    final controls = <MediaControl>[
-      MediaControl.skipToPrevious,
-      if (showSeek) MediaControl.rewind,
-      if (playing) MediaControl.pause else MediaControl.play,
-      if (showSeek) MediaControl.fastForward,
-      MediaControl.skipToNext,
-    ];
-    // The compact view always shows prev / play-pause / next.
-    final compactIndices = showSeek ? const [0, 2, 4] : const [0, 1, 2];
+    // Buttons shown in the notification, and the actions the system UI
+    // (lock screen / expanded media player / OxygenOS dynamic island) is
+    // allowed to invoke.
+    final spec = buildMediaControls(
+      playing: playing,
+      showSeek: settings.seekButtonsInNotification,
+      seekSeconds: settings.seekIntervalSeconds,
+    );
 
     playbackState.add(
       playbackState.value.copyWith(
-        controls: controls,
-        // Actions the system UI (lock screen / expanded media player /
-        // OxygenOS dynamic island) is allowed to invoke. Without these the
-        // lock-screen and pop-up controls appear but do nothing.
-        systemActions: const {
-          MediaAction.play,
-          MediaAction.pause,
-          MediaAction.playPause,
-          MediaAction.skipToNext,
-          MediaAction.skipToPrevious,
-          MediaAction.seek,
-          MediaAction.seekForward,
-          MediaAction.seekBackward,
-          MediaAction.fastForward,
-          MediaAction.rewind,
-        },
-        androidCompactActionIndices: compactIndices,
+        controls: spec.controls,
+        systemActions: spec.systemActions,
+        androidCompactActionIndices: spec.compactIndices,
         processingState: _mapState(_player.processingState),
         playing: playing,
         updatePosition: _player.position,
