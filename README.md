@@ -13,6 +13,7 @@
   <a href="https://dart.dev"><img alt="Dart" src="https://img.shields.io/badge/Dart-3.9+-0175C2?logo=dart&logoColor=white"></a>
   <img alt="Platform" src="https://img.shields.io/badge/Platform-Android%20%7C%20iOS-3DDC84?logo=android&logoColor=white">
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/License-MIT-yellow.svg"></a>
+  <a href="https://github.com/Abdullah-Masood-05/NoirPlayer/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/Abdullah-Masood-05/NoirPlayer?style=flat&logo=github&color=E53935"></a>
   <a href="https://github.com/Abdullah-Masood-05/noir-player-desktop-app"><img alt="Desktop" src="https://img.shields.io/badge/Desktop-Windows%20%7C%20macOS%20%7C%20Linux-E53935?logo=rust&logoColor=white"></a>
 </p>
 
@@ -23,6 +24,8 @@
 </p>
 
 </div>
+
+> ⭐ **Enjoying Noir Player?** If it's useful to you, please [star it on GitHub](https://github.com/Abdullah-Masood-05/NoirPlayer). It's free and it helps other people find it.
 
 ---
 
