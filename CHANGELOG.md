@@ -3,6 +3,15 @@
 Release notes for Noir Player. Each `## [x.y.z] - Title` section becomes the
 notes of the matching GitHub release.
 
+## [1.2.2] - Clearing Library search
+
+### 🔎 Library
+- **The clear (✕) button in Library search empties the search box** as well as the filter, so you can start a new search straight away.
+
+### 📦 Installing
+- **1.2.2 updates over 1.2.1 in place.** Your playlists and settings stay as they are.
+- Noir Player for Android needs **Android 7.0 or newer**.
+
 ## [1.2.1] - Skip buttons and your own seek interval
 
 ### ⏯️ Player

@@ -100,12 +100,13 @@ an Android APK and an iOS build, plus a `SHA256SUMS` file to check your download
 ### Updating from 1.1.x
 
 Version 1.2.0 is signed with a new, permanent release key, so Android won't install it over an earlier
-version. Uninstall the old Noir Player first, then install 1.2.1. Playlists and settings stored on the
-device aren't carried over. From 1.2.0 on, updates install in place: 1.2.1 installs straight over 1.2.0.
+version. Uninstall the old Noir Player first, then install 1.2.2. Playlists and settings stored on the
+device aren't carried over. From 1.2.0 on, updates install in place: 1.2.2 installs straight over 1.2.1 and 1.2.0.
 
 | Version | Notes |
 |---|---|
-| **v1.2.1** | Skip back / forward buttons on the player, a seek interval of your choice in Settings → Playback, the real version in About, one‑time notification permission for pop‑up players |
+| **v1.2.2** | The clear (✕) button in Library search empties the search box as well as the filter |
+| v1.2.1 | Skip back / forward buttons on the player, a seek interval of your choice in Settings → Playback, the real version in About, one‑time notification permission for pop‑up players |
 | v1.2.0 | Discover through Noir Player's server, your own keys in Settings → Discover, cleaner now‑playing info on system media controls, unsigned iOS IPA |
 | v1.1.3 | Instant Library tab switching, Back returns to Library |
 | v1.1.2 | Reliable downloads into your Music folder, choose the download folder |
