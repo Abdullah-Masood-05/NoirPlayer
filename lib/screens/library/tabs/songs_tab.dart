@@ -31,6 +31,7 @@ class _SongsTabState extends State<SongsTab>
   final OnAudioQuery _audioQuery = OnAudioQuery();
   List<SongModel> _songs = [];
   String _searchText = '';
+  final TextEditingController _searchController = TextEditingController();
 
   // Keep the tab alive so switching tabs doesn't dispose it and re-query the
   // whole library every time (which was the source of the tab-switch lag).
@@ -51,6 +52,7 @@ class _SongsTabState extends State<SongsTab>
     if (widget.musicFolderOnly) {
       SettingsService.instance.removeListener(_onSettingsChanged);
     }
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -452,6 +454,7 @@ class _SongsTabState extends State<SongsTab>
               ],
             ),
             child: TextField(
+              controller: _searchController,
               style: TextStyle(color: theme.textTheme.bodyLarge?.color),
               decoration: InputDecoration(
                 hintText: 'Search songs or artists...',
@@ -470,7 +473,10 @@ class _SongsTabState extends State<SongsTab>
                           Icons.clear,
                           color: theme.iconTheme.color?.withValues(alpha: 0.7),
                         ),
-                        onPressed: () => setState(() => _searchText = ''),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _searchText = '');
+                        },
                       )
                     : null,
                 border: InputBorder.none,
