@@ -1,0 +1,259 @@
+# -----------------------------------------------------------------------------
+# Noir Player Live (OnePlus Live Alerts build) - personal prerelease
+#
+# Lives ONLY on branch personal/oneplus-live-alerts. Never merge it into main.
+#
+# Trigger: push a tag `personal-oneplus-live-<N>` on this branch, or run it by
+# hand for an existing tag:
+#   gh workflow run personal-release.yml --ref personal/oneplus-live-alerts \
+#     -f tag=personal-oneplus-live-<N>
+#
+# Like release.yml nothing is rebuilt: the APKs come from the green ci.yml push
+# run of the tagged commit (artifact noir-player-android-<sha>). The release is
+# always a prerelease and never marked "Latest", so the official v* releases
+# stay on top. Only APKs are published: the App Bundle is left out because this
+# build uses another developer's package name and must not go to a store.
+#
+# Assets:
+#   NoirPlayer-Live-OnePlus-v<version>.apk               universal
+#   NoirPlayer-Live-OnePlus-v<version>-arm64-v8a.apk     per-ABI
+#   NoirPlayer-Live-OnePlus-v<version>-armeabi-v7a.apk
+#   NoirPlayer-Live-OnePlus-v<version>-x86_64.apk
+#   *.sha256 and SHA256SUMS
+#
+# Notes: .github/personal-release-notes.md (edit its "This build" line before
+# tagging) plus a downloads footer.
+#
+# Older personal-oneplus-live-* releases and their tags are deleted once the
+# new one is published (turn off with -f delete_previous=false).
+# -----------------------------------------------------------------------------
+name: Personal prerelease (Noir Player Live)
+
+on:
+  push:
+    tags: ["personal-oneplus-live-*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to publish, e.g. personal-oneplus-live-3
+        required: true
+        type: string
+      delete_previous:
+        description: Delete older personal-oneplus-live-* releases and tags
+        type: boolean
+        default: true
+
+permissions: {}
+
+concurrency:
+  group: personal-release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
+  DELETE_PREVIOUS: ${{ github.event_name == 'push' || inputs.delete_previous }}
+  CI_WAIT_MINUTES: '60'
+
+jobs:
+  publish:
+    name: Publish prerelease
+    if: github.repository == 'Abdullah-Masood-05/NoirPlayer'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 80
+    permissions:
+      contents: write # create the release, delete old ones
+      actions: read   # find and download the CI artifact
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      ALLOW_DEBUG_SIGNED: ${{ vars.ALLOW_DEBUG_SIGNED_RELEASE }}
+      EXPECTED_CERT_SHA256: ${{ vars.ANDROID_RELEASE_CERT_SHA256 }}
+    steps:
+      - name: Check tag name
+        run: |
+          if ! printf '%s' "$TAG" | grep -Eq '^personal-oneplus-live-[0-9]+$'; then
+            echo "::error::'$TAG' is not a tag like personal-oneplus-live-3."
+            exit 1
+          fi
+
+      - name: Checkout tag
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: refs/tags/${{ env.TAG }}
+          persist-credentials: false
+
+      - name: Check this is the Live build
+        id: info
+        run: |
+          set -euo pipefail
+          if ! grep -q 'applicationId = "com.blueocean.huoledj"' android/app/build.gradle.kts; then
+            echo "::error::$TAG does not point at the Live build (applicationId is not com.blueocean.huoledj). Tag a commit on personal/oneplus-live-alerts."
+            exit 1
+          fi
+          version="$(sed -nE 's/^version:[[:space:]]*["'\'']?([0-9]+\.[0-9]+\.[0-9]+)[^[:space:]]*.*/\1/p' pubspec.yaml | head -n 1)"
+          if [ -z "$version" ]; then
+            echo "::error::Could not read the version from pubspec.yaml."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "Publishing $TAG: Noir Player Live $version ($(git rev-parse HEAD))"
+
+      - name: Find the successful CI build for the tagged commit
+        id: run
+        env:
+          SHA: ${{ steps.info.outputs.sha }}
+        run: |
+          set -euo pipefail
+          artifact="noir-player-android-${SHA}"
+          start=$(date +%s)
+          deadline=$(( start + CI_WAIT_MINUTES * 60 ))
+          while :; do
+            runs="$(gh api "repos/${GH_REPO}/actions/workflows/ci.yml/runs?head_sha=${SHA}&per_page=100" \
+                    --jq '[.workflow_runs[] | select(.event == "push" or .event == "workflow_dispatch")]')"
+            run_id="$(jq -r '[.[] | select(.conclusion == "success")] | sort_by(.created_at) | last | .id // empty' <<<"$runs")"
+            if [ -n "$run_id" ]; then
+              if [ "$(gh api "repos/${GH_REPO}/actions/runs/${run_id}/artifacts?name=${artifact}" \
+                     --jq '[.artifacts[] | select(.expired | not)] | length')" -eq 0 ]; then
+                echo "::error::ci.yml run ${run_id} has no artifact ${artifact} (it may have expired). Run CI again (gh workflow run ci.yml --ref ${TAG}), then re-run this workflow."
+                exit 1
+              fi
+              echo "Using ci.yml run ${run_id}"
+              echo "id=$run_id" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            pending="$(jq '[.[] | select(.status != "completed")] | length' <<<"$runs")"
+            if [ "$(jq 'length' <<<"$runs")" -eq 0 ] && [ $(( $(date +%s) - start )) -lt 300 ]; then
+              pending=1
+            fi
+            if [ "$pending" -eq 0 ]; then
+              echo "::error::No green ci.yml run for ${SHA}. Wait for CI on personal/oneplus-live-alerts to pass (or start it: gh workflow run ci.yml --ref ${TAG}), then re-run this workflow."
+              exit 1
+            fi
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "::error::ci.yml has not finished for ${SHA} after ${CI_WAIT_MINUTES} minutes."
+              exit 1
+            fi
+            echo "CI for ${SHA} still running; checking again in 30s..."
+            sleep 30
+          done
+
+      - name: Download Android builds from CI
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: noir-player-android-${{ steps.info.outputs.sha }}
+          path: build-apk
+          run-id: ${{ steps.run.outputs.id }}
+          github-token: ${{ github.token }}
+
+      - name: Check signing, name files and write checksums
+        env:
+          VERSION: ${{ steps.info.outputs.version }}
+        run: |
+          set -euo pipefail
+          sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          apksigner="$(printf '%s\n' "$sdk"/build-tools/*/apksigner | sort -V | tail -n 1)"
+          if [ ! -x "$apksigner" ]; then
+            echo "::error::apksigner was not found under $sdk/build-tools."
+            exit 1
+          fi
+          expected=""
+          if [ -n "${EXPECTED_CERT_SHA256:-}" ]; then
+            expected="$(printf '%s' "$EXPECTED_CERT_SHA256" | tr -d ': ' | tr 'A-F' 'a-f')"
+          fi
+
+          mkdir -p dist
+          files=()
+          for abi in "" arm64-v8a armeabi-v7a x86_64; do
+            src_name="app${abi:+-$abi}-release.apk"
+            dest="NoirPlayer-Live-OnePlus-v${VERSION}${abi:+-$abi}.apk"
+            src="$(find build-apk -type f -name "$src_name" | head -n 1)"
+            if [ -z "$src" ]; then
+              if [ -z "$abi" ]; then echo "::error::app-release.apk is missing from the CI artifact."; exit 1; fi
+              echo "::warning::$src_name is not in the CI artifact; skipping it."
+              continue
+            fi
+            out="$("$apksigner" verify --print-certs "$src" 2>&1)" || { printf '%s\n' "$out"; echo "::error::apksigner verify failed for $src_name."; exit 1; }
+            signer_re='^[^:]*Signer[^:]*:? certificate'
+            dns="$(printf '%s\n' "$out" | sed -nE "s/${signer_re} DN: //p")"
+            digests="$(printf '%s\n' "$out" | sed -nE "s/${signer_re} SHA-256 digest: //p" | tr -d ': ' | tr 'A-F' 'a-f' | sort -u)"
+            echo "$src_name: $(printf '%s' "$dns" | paste -sd ';' -) / $(printf '%s' "$digests" | paste -sd ' ' -)"
+            if [ -z "$dns" ] || [ -z "$digests" ]; then
+              printf '%s\n' "$out"
+              echo "::error::Could not read the signing certificate of $src_name."
+              exit 1
+            fi
+            if printf '%s\n' "$dns" | grep -q 'CN=Android Debug' && [ "${ALLOW_DEBUG_SIGNED:-}" != "true" ]; then
+              echo "::error::$src_name is debug-signed, so it would not update the previous Noir Player Live build. Set the ANDROID_* signing secrets and re-run CI."
+              exit 1
+            fi
+            if [ -n "$expected" ] && [ "$digests" != "$expected" ]; then
+              echo "::error::$src_name is not signed with the ANDROID_RELEASE_CERT_SHA256 certificate."
+              exit 1
+            fi
+            cp "$src" "dist/$dest"
+            files+=("$dest")
+          done
+
+          cd dist
+          : > SHA256SUMS
+          for f in "${files[@]}"; do
+            sha256sum "$f" > "$f.sha256"
+            cat "$f.sha256" >> SHA256SUMS
+          done
+          sha256sum --check SHA256SUMS
+          ls -l
+
+      - name: Assemble release notes
+        env:
+          VERSION: ${{ steps.info.outputs.version }}
+        run: |
+          set -euo pipefail
+          notes=.github/personal-release-notes.md
+          if [ ! -s "$notes" ]; then
+            echo "::error::$notes is missing or empty."
+            exit 1
+          fi
+          {
+            sed "s/{version}/${VERSION}/g" "$notes"
+            echo
+            echo "### Downloads"
+            echo "- \`NoirPlayer-Live-OnePlus-v${VERSION}.apk\` works on every phone. Pick this if unsure."
+            if compgen -G 'dist/*-arm64-v8a.apk' >/dev/null; then
+              echo "- Smaller downloads: \`NoirPlayer-Live-OnePlus-v${VERSION}-arm64-v8a.apk\` suits every recent OnePlus phone (\`armeabi-v7a\` for older 32-bit phones, \`x86_64\` for emulators). Once you install one of these, keep updating with the same file: Android will not install the universal APK over it."
+            fi
+            echo "- Check a download against \`SHA256SUMS\` with \`sha256sum --check SHA256SUMS --ignore-missing\`."
+          } > release-notes.md
+
+      - name: Create or update the prerelease
+        run: |
+          set -euo pipefail
+          title="Noir Player Live — OnePlus Live Alerts build (personal, unofficial)"
+          assets=(dist/*.apk dist/*.sha256 dist/SHA256SUMS)
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; updating its assets and notes."
+            gh release upload "$TAG" "${assets[@]}" --clobber
+            gh release edit "$TAG" --title "$title" --notes-file release-notes.md --prerelease --latest=false
+          else
+            gh release create "$TAG" "${assets[@]}" --verify-tag --title "$title" \
+              --notes-file release-notes.md --prerelease --latest=false
+          fi
+
+      - name: Delete older Live prereleases
+        if: env.DELETE_PREVIOUS == 'true'
+        run: |
+          set -euo pipefail
+          n="${TAG##*-}"
+          gh release list --limit 100 --json tagName,isPrerelease \
+            --jq '.[] | select(.isPrerelease) | .tagName' |
+          while read -r old; do
+            case "$old" in
+              personal-oneplus-live-*) ;;
+              *) continue ;;
+            esac
+            old_n="${old##*-}"
+            if [[ "$old_n" =~ ^[0-9]+$ ]] && [ "$old_n" -lt "$n" ]; then
+              echo "Deleting $old"
+              gh release delete "$old" --cleanup-tag --yes
+            fi
+          done
