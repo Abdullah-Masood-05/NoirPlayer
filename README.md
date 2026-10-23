@@ -93,6 +93,19 @@ an Android APK and an iOS build, plus a `SHA256SUMS` file to check your download
 **Android** — download `NoirPlayer-vX.Y.Z.apk` on your phone (Android 7.0 or newer), open it and tap
 **Install**. If Android asks, allow your browser or file manager to install unknown apps.
 
+Releases also carry smaller APKs built for one kind of processor, plus an App Bundle:
+
+| File | For |
+|---|---|
+| `NoirPlayer-vX.Y.Z.apk` | Every phone (universal). Pick this if unsure. |
+| `NoirPlayer-vX.Y.Z-arm64-v8a.apk` | Almost every phone from the last few years (64‑bit ARM). |
+| `NoirPlayer-vX.Y.Z-armeabi-v7a.apk` | Older 32‑bit ARM phones. |
+| `NoirPlayer-vX.Y.Z-x86_64.apk` | Emulators and x86 Chromebooks. |
+| `NoirPlayer-vX.Y.Z.aab` | App stores and `bundletool`; it can't be installed by tapping it. |
+
+Once you install one of the per‑processor APKs, keep updating with the same file. Android treats them as
+newer than the universal APK, so it won't install the universal one over them.
+
 **iPhone / iPad** — download `NoirPlayer-iOS-vX.Y.Z-unsigned.ipa` and sideload it with a tool such as
 **Sideloadly** or **AltStore**, which signs it with your own Apple ID. It is built on GitHub Actions; see the
 [iOS build guide](docs/iOS_BUILD_GUIDE.md).
@@ -242,18 +255,25 @@ flutter run -d android
 
 GitHub Actions does the building, with **Flutter 3.35.7**:
 
-- **Every push** runs `ci.yml` (`flutter analyze`, `flutter test`, then a release APK) and `ios.yml`
+- **Every push** runs `ci.yml` (`flutter analyze`, `flutter test`, then a universal release APK,
+  per‑ABI APKs for `arm64-v8a`, `armeabi-v7a` and `x86_64`, and an App Bundle) and `ios.yml`
   (an unsigned IPA on a macOS runner). Both builds are kept as workflow artifacts for 30 days.
 - **Releases** publish what CI already built. Pushing a tag `vX.Y.Z` that matches the `version:` in
-  `pubspec.yaml` runs `release.yml`, which takes the APK and IPA from the green CI runs for the tagged
+  `pubspec.yaml` runs `release.yml`, which takes the Android builds and IPA from the green CI runs for the tagged
   commit, adds checksums and the notes from [`CHANGELOG.md`](CHANGELOG.md), and creates the GitHub
   release. Tag a commit once CI is green for it.
-- **Release signing:** the APK is release‑signed when these repository secrets are set:
+- **Release signing:** the APKs and App Bundle are release‑signed when these repository secrets are set:
   `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and
   `ANDROID_KEY_PASSWORD`. Without them CI signs with a debug key, and `release.yml` won't publish
-  that APK.
+  those builds.
 
-To build locally, `flutter build apk --release` produces `build/app/outputs/flutter-apk/app-release.apk`.
+To build locally:
+
+```bash
+flutter build apk --release                  # build/app/outputs/flutter-apk/app-release.apk
+flutter build apk --release --split-per-abi  # build/app/outputs/flutter-apk/app-<abi>-release.apk
+flutter build appbundle --release            # build/app/outputs/bundle/release/app-release.aab
+```
 
 ---
 

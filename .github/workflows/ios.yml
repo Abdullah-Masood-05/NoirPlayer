@@ -61,6 +61,8 @@ concurrency:
 jobs:
   build-ios:
     name: Build iOS IPA
+    # personal/* branches (e.g. the OnePlus Live build) are Android-only.
+    if: ${{ !startsWith(github.head_ref || github.ref_name, 'personal/') }}
     runs-on: macos-latest
     timeout-minutes: 60
     env:
