@@ -3,6 +3,17 @@
 Release notes for Noir Player. Each `## [x.y.z] - Title` section becomes the
 notes of the matching GitHub release.
 
+## [1.2.3] - Launch screen and smaller downloads
+
+### 🚀 Launch
+- **The launch screen shows the Noir Player logo on its own.** On Android 12 and newer it no longer appears inside a white square.
+
+### 📦 Downloads
+- **Smaller Android downloads.** Each release now includes APKs built for one processor type (`arm64-v8a` for most phones from the last few years, `armeabi-v7a` for older 32-bit phones, `x86_64` for emulators), plus an Android App Bundle for app stores. The universal APK is still there; pick it if you're not sure.
+
+### 📦 Installing
+- **1.2.3 updates over 1.2.2 in place.** Your playlists and settings stay as they are.
+
 ## [1.2.2] - Clearing Library search
 
 ### 🔎 Library
