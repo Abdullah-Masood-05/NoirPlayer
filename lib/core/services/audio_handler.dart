@@ -70,6 +70,15 @@ class AudioPlayerHandler extends BaseAudioHandler {
 
   static const _kLastSong = 'playback.lastSong';
 
+  /// MediaItem extra holding a local song's file path, so the song that is
+  /// actually playing can be saved without relying on [_songs] (the Library
+  /// replaces that list when it loads, even while a restored song is loaded).
+  static const _kPathExtra = 'path';
+
+  /// True while [restoreLastSong] runs, so it can't overwrite the saved
+  /// position with the not-yet-restored one.
+  bool _restoring = false;
+
   Stream<Duration> get positionStream => _player.positionStream;
   Stream<Duration?> get durationStream => _player.durationStream;
 
@@ -174,11 +183,25 @@ class AudioPlayerHandler extends BaseAudioHandler {
   // ---------------------------------------------------------------------------
 
   Future<void> _updateMediaItemForIndex(int? index) async {
-    if (index == null || index < 0 || index >= queue.value.length) return;
+    if (index == null || index < 0) return;
 
-    var item = queue.value[index];
+    // Take the item from the player's own sources: the published queue can be
+    // replaced (the Library sets it when it loads) while an older source, such
+    // as a restored last song, is still the one loaded.
+    final sequence = _player.sequence;
+    final tag = index < sequence.length ? sequence[index].tag : null;
+    MediaItem item;
+    if (index < queue.value.length &&
+        (tag is! MediaItem || queue.value[index].id == tag.id)) {
+      item = queue.value[index]; // may already carry artwork
+    } else if (tag is MediaItem) {
+      item = tag;
+    } else {
+      return;
+    }
     // Emit immediately so the title/artist update even before artwork loads.
     mediaItem.add(item);
+    _saveLastSong();
 
     if (item.artUri != null) return;
 
@@ -247,6 +270,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
         duration: song.duration != null
             ? Duration(milliseconds: song.duration!)
             : null,
+        extras: {_kPathExtra: song.data},
       );
     } else if (song is PlaylistSong) {
       return MediaItem(
@@ -257,6 +281,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
         duration: song.duration != null
             ? Duration(milliseconds: song.duration!)
             : null,
+        extras: {_kPathExtra: song.data},
       );
     }
     throw Exception('Unsupported song type');
@@ -516,17 +541,21 @@ class AudioPlayerHandler extends BaseAudioHandler {
   // Resume-last-song persistence
   // ---------------------------------------------------------------------------
 
+  /// Save the current song and position now (e.g. when the app is backgrounded).
+  void saveLastSong() => _saveLastSong();
+
   void _saveLastSong() {
-    final index = _player.currentIndex;
-    if (index == null || index < 0 || index >= _songs.length) return;
+    if (_restoring) return;
     final item = mediaItem.value;
-    if (item == null) return;
+    // Only local songs carry a path; Discover streams are not remembered.
+    final path = item?.extras?[_kPathExtra];
+    if (item == null || path is! String || path.isEmpty) return;
     final data = jsonEncode({
       'id': item.id,
       'title': item.title,
       'artist': item.artist,
       'album': item.album,
-      'path': _pathOf(_songs[index]),
+      'path': path,
       'durationMs': item.duration?.inMilliseconds,
       'positionMs': _player.position.inMilliseconds,
     });
@@ -535,6 +564,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
 
   /// Restore the last played song (paused, at its saved position) on launch.
   Future<void> restoreLastSong() async {
+    _restoring = true;
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(_kLastSong);
@@ -552,6 +582,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
         duration: data['durationMs'] != null
             ? Duration(milliseconds: data['durationMs'] as int)
             : null,
+        extras: {_kPathExtra: path},
       );
 
       queue.add([item]);
@@ -583,6 +614,8 @@ class AudioPlayerHandler extends BaseAudioHandler {
       }
     } catch (e) {
       debugPrint('❌ Error restoring last song: $e');
+    } finally {
+      _restoring = false;
     }
   }
 

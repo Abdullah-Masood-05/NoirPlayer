@@ -27,8 +27,25 @@ void main() async {
     await (audioHandler as AudioPlayerHandler).restoreLastSong();
   }
 
+  // Remember the current song and position whenever the app leaves the
+  // foreground, so the mini-player can show it again after the system kills
+  // the process.
+  WidgetsBinding.instance.addObserver(_SaveOnBackground());
+
   timeDilation = 1.0;
   runApp(const NoirPlayerApp());
+}
+
+class _SaveOnBackground with WidgetsBindingObserver {
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      if (isAudioServiceInitialized()) {
+        (audioHandler as AudioPlayerHandler).saveLastSong();
+      }
+    }
+  }
 }
 
 class NoirPlayerApp extends StatelessWidget {

@@ -3,6 +3,15 @@
 Release notes for Noir Player. Each `## [x.y.z] - Title` section becomes the
 notes of the matching GitHub release.
 
+## [1.2.4] - Picks up where you left off
+
+### ⏯️ Player
+- **Noir Player remembers the last song you played.** Close the app after listening and, when you open it again, the mini player shows that song paused where you stopped, ready to continue with one tap. Turn this off in Settings with **Resume last song**.
+- Songs streamed from Discover aren't remembered; the app reopens on the last song from your library.
+
+### 📦 Installing
+- **1.2.4 updates over 1.2.3 in place.** Your playlists and settings stay as they are.
+
 ## [1.2.3] - Launch screen and smaller downloads
 
 ### 🚀 Launch
