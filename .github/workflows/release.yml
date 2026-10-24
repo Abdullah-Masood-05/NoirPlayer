@@ -17,11 +17,18 @@
 #      fails and asks you to wait for CI to go green (or start it on the tag:
 #      gh workflow run ci.yml --ref v<version> / gh workflow run ios.yml --ref
 #      v<version>) and then re-run this workflow.
-#   2. publish: download both artifacts, refuse a debug-signed APK, name the
-#      files, write checksums and create ONE GitHub release with every asset.
+#   2. publish: download both artifacts, refuse debug-signed Android builds,
+#      name the files, write checksums and create ONE GitHub release with
+#      every asset.
 #
 # Assets:
-#   NoirPlayer-v<version>.apk               (+ .sha256)
+#   NoirPlayer-v<version>.apk               universal APK (+ .sha256)
+#   NoirPlayer-v<version>-arm64-v8a.apk     per-ABI APKs (+ .sha256 each)
+#   NoirPlayer-v<version>-armeabi-v7a.apk
+#   NoirPlayer-v<version>-x86_64.apk
+#   NoirPlayer-v<version>.aab               App Bundle (+ .sha256)
+#     The per-ABI APKs and the .aab are skipped (not an error) when the CI
+#     artifact predates them.
 #   NoirPlayer-iOS-v<version>-unsigned.ipa  (+ .sha256; `NoirPlayer-iOS-v<version>.ipa`
 #                                            when ios.yml produced a signed build)
 #   SHA256SUMS                              (all of the above)
@@ -37,12 +44,12 @@
 #   the title. Otherwise the title is "Noir Player v1.2.0". A short downloads /
 #   checksum footer is appended.
 #
-# Signing: a release APK must be signed with the release keystore (see ci.yml)
-# so users can update in place. The certificate is checked with apksigner;
-# a debug certificate is refused unless repository variable
-# ALLOW_DEBUG_SIGNED_RELEASE=true. If repository variable
-# ANDROID_RELEASE_CERT_SHA256 is set, the APK's signing certificate SHA-256
-# must match it.
+# Signing: release APKs and the App Bundle must be signed with the release
+# keystore (see ci.yml) so users can update in place. APK certificates are
+# checked with apksigner, the bundle's with keytool; a debug certificate is
+# refused unless repository variable ALLOW_DEBUG_SIGNED_RELEASE=true. If
+# repository variable ANDROID_RELEASE_CERT_SHA256 is set, every build's signing
+# certificate SHA-256 must match it.
 # -----------------------------------------------------------------------------
 name: Release
 
@@ -223,7 +230,7 @@ jobs:
       - name: Fetch annotated tag
         run: git fetch --force --no-tags --depth=1 "https://github.com/${GH_REPO}.git" "refs/tags/${TAG}:refs/tags/${TAG}"
 
-      - name: Download APK from CI
+      - name: Download Android builds from CI
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: noir-player-android-${{ needs.prepare.outputs.sha }}
@@ -239,17 +246,37 @@ jobs:
           run-id: ${{ needs.prepare.outputs.ios_run }}
           github-token: ${{ github.token }}
 
+      # CI artifacts made before the split APKs / App Bundle were added hold
+      # only app-release.apk at their root; newer ones hold flutter-apk/ and
+      # bundle/release/. Locate every file by name so both layouts work.
+      - name: Locate Android builds
+        run: |
+          set -euo pipefail
+          find_one() { find build-apk -type f -name "$1" | sort | head -n 1; }
+          universal="$(find_one app-release.apk)"
+          if [ -z "$universal" ] || [ ! -s "$universal" ]; then
+            echo "::error::app-release.apk is missing or empty in the CI artifact. Contents of build-apk:"
+            ls -laR build-apk || true
+            exit 1
+          fi
+          {
+            echo "APK_UNIVERSAL=$universal"
+            echo "APK_ARM64=$(find_one app-arm64-v8a-release.apk)"
+            echo "APK_ARMV7=$(find_one app-armeabi-v7a-release.apk)"
+            echo "APK_X86_64=$(find_one app-x86_64-release.apk)"
+            echo "AAB=$(find_one app-release.aab)"
+          } >> "$GITHUB_ENV"
+          find build-apk -type f -exec ls -l {} +
+
       - name: Require release signing
         run: |
           # Every failure path below prints an ::error:: with the reason; no
           # command is allowed to end the step silently.
           set -uo pipefail
-          apk=build-apk/app-release.apk
-          if [ ! -s "$apk" ]; then
-            echo "::error::$apk is missing or empty in the CI artifact. Contents of build-apk:"
-            ls -laR build-apk || true
-            exit 1
-          fi
+          apks=()
+          for f in "$APK_UNIVERSAL" "$APK_ARM64" "$APK_ARMV7" "$APK_X86_64"; do
+            if [ -n "$f" ]; then apks+=("$f"); fi
+          done
 
           sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
           # Newest build-tools wins (an unmatched glob stays literal and fails -x).
@@ -260,50 +287,80 @@ jobs:
           fi
           echo "Using $apksigner"
 
-          status=0
-          out="$("$apksigner" verify --print-certs "$apk" 2>&1)" || status=$?
-          echo "----- apksigner verify --print-certs -----"
-          printf '%s\n' "$out"
-          echo "----- exit status: $status -----"
-          if [ "$status" -ne 0 ]; then
-            echo "::error::apksigner verify failed (exit status $status) for $apk; see its output above."
-            exit 1
-          fi
-
-          # apksigner's output format differs between build-tools versions:
-          #   <= 36.x: "Signer #1 certificate DN: ..." / "Signer #1 certificate SHA-256 digest: ..."
-          #   >= 37:   "V2 Signer: certificate DN: ..." / "V2 Signer: certificate SHA-256 digest: ..."
-          # (and "Signer (minSdkVersion=..) ..." for SDK-targeted v3.1 signers).
-          # Accept any "<...Signer...> certificate <field>: <value>" line.
-          signer_re='^[^:]*Signer[^:]*:? certificate'
-          dns="$(printf '%s\n' "$out" | sed -nE "s/${signer_re} DN: //p")"
-          digests="$(printf '%s\n' "$out" | sed -nE "s/${signer_re} SHA-256 digest: //p" | tr -d ': ' | tr 'A-F' 'a-f' | sort -u)"
-          if [ -z "$dns" ] || [ -z "$digests" ]; then
-            echo "::error::Could not read the signing certificate (DN and SHA-256 digest) from apksigner's output above; the output format may have changed."
-            exit 1
-          fi
-          echo "Signer DN(s): $(printf '%s' "$dns" | paste -sd ';' -)"
-          echo "Signer certificate SHA-256: $(printf '%s' "$digests" | paste -sd ' ' -)"
-
-          if printf '%s\n' "$dns" | grep -q 'CN=Android Debug'; then
-            if [ "${ALLOW_DEBUG_SIGNED:-}" = "true" ]; then
-              echo "::warning title=Debug-signed release::Publishing a debug-signed APK (ALLOW_DEBUG_SIGNED_RELEASE=true). It will not install as an update over other releases."
-              exit 0
-            fi
-            echo "::error::The CI build of ${SHA} is signed with the debug key. Set the ANDROID_* signing secrets (see ci.yml), re-run CI on this commit, then re-run this workflow. To publish anyway, set repository variable ALLOW_DEBUG_SIGNED_RELEASE=true."
-            exit 1
-          fi
-
+          expected=""
           if [ -n "${EXPECTED_CERT_SHA256:-}" ]; then
             expected="$(printf '%s' "$EXPECTED_CERT_SHA256" | tr -d ': ' | tr 'A-F' 'a-f')"
+          fi
+          debug_seen=false
+
+          # check_cert <file> <signer DN lines> <normalised SHA-256 digests>
+          check_cert() {
+            local file="$1" dns="$2" digests="$3"
+            if [ -z "$dns" ] || [ -z "$digests" ]; then
+              echo "::error::Could not read the signing certificate (DN and SHA-256 digest) of $file from the output above; the output format may have changed."
+              return 1
+            fi
+            echo "$file: signer DN(s): $(printf '%s' "$dns" | paste -sd ';' -)"
+            echo "$file: signer certificate SHA-256: $(printf '%s' "$digests" | paste -sd ' ' -)"
+            if printf '%s\n' "$dns" | grep -q 'CN=Android Debug'; then
+              if [ "${ALLOW_DEBUG_SIGNED:-}" = "true" ]; then
+                debug_seen=true
+                return 0
+              fi
+              echo "::error::$file from the CI build of ${SHA} is signed with the debug key. Set the ANDROID_* signing secrets (see ci.yml), re-run CI on this commit, then re-run this workflow. To publish anyway, set repository variable ALLOW_DEBUG_SIGNED_RELEASE=true."
+              return 1
+            fi
             # Every signer (v1/v2/v3...) must use the release certificate.
-            if [ "$digests" != "$expected" ]; then
-              echo "::error::The APK is signed with certificate(s) $(printf '%s' "$digests" | paste -sd ' ' -), not the release certificate ${expected} in ANDROID_RELEASE_CERT_SHA256."
+            if [ -n "$expected" ] && [ "$digests" != "$expected" ]; then
+              echo "::error::$file is signed with certificate(s) $(printf '%s' "$digests" | paste -sd ' ' -), not the release certificate ${expected} in ANDROID_RELEASE_CERT_SHA256."
+              return 1
+            fi
+          }
+
+          for apk in "${apks[@]}"; do
+            status=0
+            out="$("$apksigner" verify --print-certs "$apk" 2>&1)" || status=$?
+            echo "----- apksigner verify --print-certs $apk -----"
+            printf '%s\n' "$out"
+            echo "----- exit status: $status -----"
+            if [ "$status" -ne 0 ]; then
+              echo "::error::apksigner verify failed (exit status $status) for $apk; see its output above."
               exit 1
             fi
-            echo "Signing certificate matches ANDROID_RELEASE_CERT_SHA256."
+            # apksigner's output format differs between build-tools versions:
+            #   <= 36.x: "Signer #1 certificate DN: ..." / "Signer #1 certificate SHA-256 digest: ..."
+            #   >= 37:   "V2 Signer: certificate DN: ..." / "V2 Signer: certificate SHA-256 digest: ..."
+            # (and "Signer (minSdkVersion=..) ..." for SDK-targeted v3.1 signers).
+            # Accept any "<...Signer...> certificate <field>: <value>" line.
+            signer_re='^[^:]*Signer[^:]*:? certificate'
+            dns="$(printf '%s\n' "$out" | sed -nE "s/${signer_re} DN: //p")"
+            digests="$(printf '%s\n' "$out" | sed -nE "s/${signer_re} SHA-256 digest: //p" | tr -d ': ' | tr 'A-F' 'a-f' | sort -u)"
+            check_cert "$apk" "$dns" "$digests" || exit 1
+          done
+
+          # An App Bundle carries a JAR (v1) signature, which apksigner does not
+          # read; keytool prints its certificate instead.
+          if [ -n "$AAB" ]; then
+            status=0
+            out="$(keytool -printcert -jarfile "$AAB" 2>&1)" || status=$?
+            echo "----- keytool -printcert -jarfile $AAB -----"
+            printf '%s\n' "$out"
+            echo "----- exit status: $status -----"
+            if [ "$status" -ne 0 ] || printf '%s\n' "$out" | grep -qi 'not a signed jar'; then
+              echo "::error::Could not read a signature from $AAB; see the keytool output above."
+              exit 1
+            fi
+            dns="$(printf '%s\n' "$out" | sed -nE 's/^[[:space:]]*Owner: //p')"
+            digests="$(printf '%s\n' "$out" | sed -nE 's/^[[:space:]]*SHA256: //p' | tr -d ': ' | tr 'A-F' 'a-f' | sort -u)"
+            check_cert "$AAB" "$dns" "$digests" || exit 1
+          fi
+
+          if [ "$debug_seen" = "true" ]; then
+            echo "::warning title=Debug-signed release::Publishing debug-signed Android builds (ALLOW_DEBUG_SIGNED_RELEASE=true). They will not install as an update over other releases."
+          elif [ -n "$expected" ]; then
+            echo "Every Android build is signed with the ANDROID_RELEASE_CERT_SHA256 certificate."
           else
-            echo "::notice::ANDROID_RELEASE_CERT_SHA256 is not set; the APK is release-signed (not debug) but its certificate was not pinned."
+            echo "::notice::ANDROID_RELEASE_CERT_SHA256 is not set; the Android builds are release-signed (not debug) but their certificate was not pinned."
           fi
 
       - name: Name files and write checksums
@@ -311,7 +368,21 @@ jobs:
           set -euo pipefail
           mkdir -p dist
           apk="NoirPlayer-v${VERSION}.apk"
-          cp build-apk/app-release.apk "dist/$apk"
+          cp "$APK_UNIVERSAL" "dist/$apk"
+          files=("$apk")
+          # add <source path, may be empty> <release file name>: the split APKs
+          # and the App Bundle are only in artifacts from the current ci.yml.
+          add() {
+            if [ -n "$1" ]; then cp "$1" "dist/$2"; files+=("$2"); fi
+          }
+          add "$APK_ARM64"  "NoirPlayer-v${VERSION}-arm64-v8a.apk"
+          add "$APK_ARMV7"  "NoirPlayer-v${VERSION}-armeabi-v7a.apk"
+          add "$APK_X86_64" "NoirPlayer-v${VERSION}-x86_64.apk"
+          add "$AAB"        "NoirPlayer-v${VERSION}.aab"
+          {
+            echo "HAS_SPLITS=$([ -n "$APK_ARM64$APK_ARMV7$APK_X86_64" ] && echo true || echo false)"
+            echo "HAS_AAB=$([ -n "$AAB" ] && echo true || echo false)"
+          } >> "$GITHUB_ENV"
 
           mapfile -t ipas < <(find build-ipa -type f -name '*.ipa' | sort)
           if [ "${#ipas[@]}" -ne 1 ]; then
@@ -323,13 +394,16 @@ jobs:
             *)              ipa="NoirPlayer-iOS-v${VERSION}.ipa" ;;
           esac
           cp "${ipas[0]}" "dist/$ipa"
+          files+=("$ipa")
           echo "IPA_NAME=$ipa" >> "$GITHUB_ENV"
 
           cd dist
-          test -s "$apk" && test -s "$ipa"
-          sha256sum "$apk" > "$apk.sha256"
-          sha256sum "$ipa" > "$ipa.sha256"
-          cat "$apk.sha256" "$ipa.sha256" > SHA256SUMS
+          : > SHA256SUMS
+          for f in "${files[@]}"; do
+            test -s "$f"
+            sha256sum "$f" > "$f.sha256"
+            cat "$f.sha256" >> SHA256SUMS
+          done
           sha256sum --check SHA256SUMS
           ls -l
 
@@ -374,8 +448,17 @@ jobs:
           ipa_line = (f'- **iPhone / iPad:** `{ipa}` is not signed; sideload it with a tool such as Sideloadly or AltStore.\n'
                       if ipa.endswith('-unsigned.ipa') else
                       f'- **iPhone / iPad:** `{ipa}`.\n')
+          android_lines = f'- **Android:** `{apk}` works on every phone. You may need to allow installing from unknown sources.\n'
+          if os.environ.get('HAS_SPLITS') == 'true':
+              android_lines += (f'- **Android, smaller download:** `NoirPlayer-v{version}-arm64-v8a.apk` suits almost every '
+                                'phone from the last few years (`armeabi-v7a` for older 32-bit phones, `x86_64` for '
+                                'emulators and Chromebooks). Once you install one of these, keep updating with the same '
+                                'file: Android will not install the universal APK over it.\n')
+          if os.environ.get('HAS_AAB') == 'true':
+              android_lines += (f'- **Android App Bundle:** `NoirPlayer-v{version}.aab` is for app stores and '
+                                '`bundletool`; it cannot be installed by tapping it.\n')
           footer = ('### Downloads\n'
-                    f'- **Android:** `{apk}`. You may need to allow installing from unknown sources.\n'
+                    + android_lines
                     + ipa_line +
                     '- Check a download against `SHA256SUMS` with `sha256sum --check SHA256SUMS --ignore-missing`.\n')
           body = notes + '\n\n' + footer if notes else footer
@@ -391,6 +474,7 @@ jobs:
           set -euo pipefail
           title="$(cat release-title.txt)"
           assets=(dist/*.apk dist/*.ipa dist/*.sha256 dist/SHA256SUMS)
+          if compgen -G 'dist/*.aab' >/dev/null; then assets+=(dist/*.aab); fi
 
           update_existing() {
             echo "Release $TAG already exists (e.g. a re-run); updating its assets, title and notes."

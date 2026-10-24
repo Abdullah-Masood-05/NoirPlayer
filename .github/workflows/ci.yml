@@ -2,8 +2,15 @@
 # Noir Player (Android) - continuous integration
 #
 # Runs on every branch push (main included) and pull request: pub get,
-# analyze, test, then builds the release APK and uploads it as the workflow
-# artifact `noir-player-android-<commit sha>` (kept for 30 days).
+# analyze, test, then builds the Android release outputs and uploads them as
+# the workflow artifact `noir-player-android-<commit sha>` (kept for 30 days):
+#   app-release.apk                universal APK (every ABI)
+#   app-arm64-v8a-release.apk      per-ABI APKs (--split-per-abi): smaller
+#   app-armeabi-v7a-release.apk    downloads, one CPU architecture each
+#   app-x86_64-release.apk
+#   app-release.aab                Android App Bundle (Play Store / bundletool)
+# Split APKs get Flutter's per-ABI versionCode (ABI * 1000 + build number), so
+# a phone that installed one must keep updating with the same ABI's APK.
 #
 # Releases reuse that artifact: when a `v*` tag is pushed, release.yml looks
 # up the successful push run of this workflow for the tagged commit and
@@ -143,8 +150,16 @@ jobs:
           echo "Release keystore configured."
           echo "signed=true" >> "$GITHUB_OUTPUT"
 
-      - name: Build release APK
+      # Each command leaves its outputs in place, so all of them end up in
+      # build/app/outputs: universal APK, per-ABI APKs and the App Bundle.
+      - name: Build universal APK
         run: flutter build apk --release
+
+      - name: Build per-ABI APKs
+        run: flutter build apk --release --split-per-abi
+
+      - name: Build App Bundle
+        run: flutter build appbundle --release
 
       - name: Remove signing material
         if: always()
@@ -158,7 +173,12 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ steps.artifact.outputs.name }}
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+            build/app/outputs/flutter-apk/app-x86_64-release.apk
+            build/app/outputs/bundle/release/app-release.aab
           if-no-files-found: error
           retention-days: 30
           compression-level: 0
