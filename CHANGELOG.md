@@ -3,6 +3,14 @@
 Release notes for Noir Player. Each `## [x.y.z] - Title` section becomes the
 notes of the matching GitHub release.
 
+## [1.2.5] - Rounded app icon
+
+### 🎨 Look
+- **The app icon has softly rounded corners** on Android, so it sits more neatly next to your other apps.
+
+### 📦 Installing
+- **1.2.5 updates over 1.2.4 in place.** Your playlists and settings stay as they are.
+
 ## [1.2.4] - Picks up where you left off
 
 ### ⏯️ Player
