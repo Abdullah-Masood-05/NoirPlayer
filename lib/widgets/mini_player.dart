@@ -1,5 +1,6 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/state/playback.dart';
@@ -19,49 +20,64 @@ class MiniPlayer extends ConsumerWidget {
 
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
+    final handler = ref.watch(audioHandlerProvider);
 
     return Material(
       color: theme.colorScheme.surface,
       elevation: 8,
-      child: InkWell(
-        onTap: onTap,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _Progress(total: mediaItem.duration, color: primary),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              child: Row(
-                children: [
-                  _artwork(mediaItem, primary),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          mediaItem.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontSize: 14,
+      // Swipe left for the next song, right for the previous one.
+      child: GestureDetector(
+        onHorizontalDragEnd: handler == null
+            ? null
+            : (details) {
+                final v = details.primaryVelocity ?? 0;
+                if (v.abs() < 300) return;
+                HapticFeedback.lightImpact();
+                v < 0 ? handler.playNext() : handler.playPrevious();
+              },
+        child: InkWell(
+          onTap: onTap,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _Progress(total: mediaItem.duration, color: primary),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                child: Row(
+                  children: [
+                    _artwork(mediaItem, primary),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            mediaItem.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontSize: 14,
+                            ),
                           ),
-                        ),
-                        Text(
-                          mediaItem.artist ?? '',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall,
-                        ),
-                      ],
+                          Text(
+                            mediaItem.artist ?? '',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const _Buttons(),
-                ],
+                    const _Buttons(),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -140,13 +156,23 @@ class _Buttons extends ConsumerWidget {
               size: 30,
             ),
           ),
+          tooltip: playing ? 'Pause' : 'Play',
           onPressed: handler == null
               ? null
-              : () => playing ? handler.pause() : handler.play(),
+              : () {
+                  HapticFeedback.mediumImpact();
+                  playing ? handler.pause() : handler.play();
+                },
         ),
         IconButton(
           icon: const Icon(Icons.skip_next_rounded, size: 30),
-          onPressed: handler?.playNext,
+          tooltip: 'Next',
+          onPressed: handler == null
+              ? null
+              : () {
+                  HapticFeedback.lightImpact();
+                  handler.playNext();
+                },
         ),
       ],
     );
