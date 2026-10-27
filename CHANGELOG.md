@@ -22,6 +22,7 @@ notes of the matching GitHub release.
 - **Up next:** see the queue in the order it will play, shuffle included, and tap any song to jump to it.
 - **Swipe the mini player** left for the next song or right for the previous one.
 - Gentle **vibration feedback** on play/pause, skip and favourites.
+- The little bars that mark the playing song **move only while it plays** and hold still when paused.
 
 ### 📦 Installing
 - **2.0.0 updates over 1.2.5 in place.** Your playlists and settings stay as they are.
