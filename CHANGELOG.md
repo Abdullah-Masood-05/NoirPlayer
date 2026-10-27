@@ -11,6 +11,7 @@ notes of the matching GitHub release.
 - **Cover art is remembered** while you scroll, so it no longer flickers back in, and Discover covers are kept between launches.
 
 ### 🎵 Library
+- **The Music tab is arranged A–Z:** songs sit under letter headings (# for titles that don't start with a letter) showing how many songs each has, with every song numbered. Play, Shuffle and tapping a song follow that order.
 - **Play and Shuffle buttons** above every song list play everything shown, including search results, and show how many songs there are.
 - **Fast scroll:** drag the scroll bar to move quickly through a long library. A new search starts at the top of the results.
 - **A ⋮ menu on every song** with Play and Add to playlist, so you no longer need to know about long-press. Each song's length now sits next to its artist.

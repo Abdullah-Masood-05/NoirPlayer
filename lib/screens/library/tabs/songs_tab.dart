@@ -40,6 +40,35 @@ class _SongsTabState extends ConsumerState<SongsTab>
   // Lower-cased "title\nartist" per song id, built once per song list.
   final Map<int, String> _searchKeys = {};
 
+  // The last grouped layout, reused until the filtered list changes.
+  List<SongModel>? _groupSource;
+  _GroupedSongs _grouped = const _GroupedSongs([], []);
+
+  /// The Music tab lists songs under A–Z headings with row numbers.
+  bool get _groupByLetter => widget.musicFolderOnly;
+
+  _GroupedSongs _group(List<SongModel> songs) {
+    if (!identical(songs, _groupSource)) {
+      _groupSource = songs;
+      _grouped = _GroupedSongs.of(songs);
+    }
+    return _grouped;
+  }
+
+  // The whole tab grouped, used as the play queue while searching.
+  List<SongModel>? _allGroupSource;
+  List<SongModel> _allGrouped = const [];
+
+  List<SongModel> _groupAll(List<SongModel> songs) {
+    if (!identical(songs, _allGroupSource)) {
+      _allGroupSource = songs;
+      _allGrouped = identical(songs, _groupSource)
+          ? _grouped.songs
+          : _GroupedSongs.of(songs).songs;
+    }
+    return _allGrouped;
+  }
+
   /// Rows above this index fade in when first built; rows further down appear
   /// straight away so fast scrolling doesn't start an animation per row.
   static const _animatedRows = 15;
@@ -395,12 +424,18 @@ class _SongsTabState extends ConsumerState<SongsTab>
       );
     }
 
+    // In the Music tab, songs play in the order shown: by letter group.
+    final grouped = _groupByLetter ? _group(filteredSongs) : null;
+    final shown = grouped?.songs ?? filteredSongs;
+    final queue = _groupByLetter ? _groupAll(songs) : songs;
+    final entries = grouped?.entries;
+
     return Column(
       children: [
         _ListHeader(
-          count: filteredSongs.length,
-          onPlay: () => _playAll(filteredSongs, shuffle: false),
-          onShuffle: () => _playAll(filteredSongs, shuffle: true),
+          count: shown.length,
+          onPlay: () => _playAll(shown, shuffle: false),
+          onShuffle: () => _playAll(shown, shuffle: true),
         ),
         Expanded(
           child: RefreshIndicator(
@@ -418,15 +453,24 @@ class _SongsTabState extends ConsumerState<SongsTab>
                   parent: AlwaysScrollableScrollPhysics(),
                 ),
                 cacheExtent: 500,
-                itemCount: filteredSongs.length,
+                itemCount: entries?.length ?? shown.length,
                 itemBuilder: (context, index) {
-                  final song = filteredSongs[index];
+                  final entry = entries?[index];
+                  if (entry is _LetterEntry) {
+                    return _LetterHeader(
+                      key: ValueKey('letter-${entry.letter}'),
+                      letter: entry.letter,
+                      count: entry.count,
+                    );
+                  }
+                  final song = entry is _SongEntry ? entry.song : shown[index];
                   return _SongTile(
                     key: ValueKey(song.id),
                     song: song,
+                    number: entry is _SongEntry ? entry.number : null,
                     animationIndex: index < _animatedRows ? index : null,
                     // Queue the whole tab, not just the search results.
-                    onTap: () => _play(songs, song),
+                    onTap: () => _play(queue, song),
                     onAddToPlaylist: () => _addSongToPlaylist(song),
                   );
                 },
@@ -507,9 +551,13 @@ class _SongTile extends ConsumerWidget {
     required this.animationIndex,
     required this.onTap,
     required this.onAddToPlaylist,
+    this.number,
   });
 
   final SongModel song;
+
+  /// Row number shown on the left (Music tab), or null for none.
+  final int? number;
 
   /// Position used to stagger the fade-in, or null for no animation.
   final int? animationIndex;
@@ -544,6 +592,20 @@ class _SongTile extends ConsumerWidget {
           ),
           child: Row(
             children: [
+              if (number != null)
+                SizedBox(
+                  width: 34,
+                  child: Text(
+                    '$number',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                      color: theme.textTheme.bodySmall?.color?.withValues(
+                        alpha: 0.7,
+                      ),
+                    ),
+                  ),
+                ),
               // Artwork
               Container(
                 width: 56,
@@ -691,6 +753,125 @@ class _SongTile extends ConsumerWidget {
 
 enum _SongAction { play, addToPlaylist }
 
+/// A row of the Music tab: a letter heading or a numbered song.
+sealed class _Entry {
+  const _Entry();
+}
+
+class _LetterEntry extends _Entry {
+  const _LetterEntry(this.letter, this.count);
+  final String letter;
+  final int count;
+}
+
+class _SongEntry extends _Entry {
+  const _SongEntry(this.song, this.number);
+  final SongModel song;
+  final int number;
+}
+
+/// Songs grouped under '#' (titles not starting with a letter) and A–Z,
+/// keeping their order within each group.
+class _GroupedSongs {
+  const _GroupedSongs(this.entries, this.songs);
+
+  /// Headings and songs, in display order.
+  final List<_Entry> entries;
+
+  /// The songs alone, in display order (the play queue).
+  final List<SongModel> songs;
+
+  static String letterOf(String title) {
+    final first = title.trimLeft();
+    if (first.isEmpty) return '#';
+    final c = first[0].toUpperCase();
+    final code = c.codeUnitAt(0);
+    return code >= 65 && code <= 90 ? c : '#';
+  }
+
+  factory _GroupedSongs.of(List<SongModel> songs) {
+    final groups = <String, List<SongModel>>{};
+    for (final s in songs) {
+      (groups[letterOf(s.title)] ??= []).add(s);
+    }
+    final letters = groups.keys.toList()
+      ..sort((a, b) {
+        if (a == b) return 0;
+        if (a == '#') return -1;
+        if (b == '#') return 1;
+        return a.compareTo(b);
+      });
+
+    final entries = <_Entry>[];
+    final ordered = <SongModel>[];
+    for (final letter in letters) {
+      final group = groups[letter]!;
+      entries.add(_LetterEntry(letter, group.length));
+      for (final s in group) {
+        ordered.add(s);
+        entries.add(_SongEntry(s, ordered.length));
+      }
+    }
+    return _GroupedSongs(
+      List.unmodifiable(entries),
+      List.unmodifiable(ordered),
+    );
+  }
+}
+
+/// "A  3 ────" heading above each letter's songs.
+class _LetterHeader extends StatelessWidget {
+  const _LetterHeader({super.key, required this.letter, required this.count});
+
+  final String letter;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 18, 12, 6),
+      child: Row(
+        children: [
+          Container(
+            width: 26,
+            height: 26,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: primary.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(7),
+            ),
+            child: Text(
+              letter,
+              style: TextStyle(
+                color: primary,
+                fontWeight: FontWeight.w800,
+                fontSize: 13,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            '$count',
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Divider(
+              height: 1,
+              thickness: 0.6,
+              color: theme.dividerColor.withValues(alpha: 0.4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Song count with Play and Shuffle for everything currently listed.
 class _ListHeader extends StatelessWidget {
   const _ListHeader({
@@ -829,3 +1010,7 @@ class _PlaylistChoice extends StatelessWidget {
     );
   }
 }
+
+/// The letter heading a song title is listed under in the Music tab.
+@visibleForTesting
+String songLetterOf(String title) => _GroupedSongs.letterOf(title);
