@@ -5,7 +5,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:noir_player/core/services/media_controls.dart';
-import 'package:noir_player/core/services/settings_service.dart';
+import 'package:noir_player/core/state/settings.dart';
 import 'package:noir_player/screens/about/about_screen.dart';
 import 'package:noir_player/widgets/seek_button.dart';
 
@@ -105,49 +105,49 @@ void main() {
 
   group('seek interval validation', () {
     test('accepts 1 to 300 seconds', () {
-      expect(SettingsService.isValidSeekInterval(1), isTrue);
-      expect(SettingsService.isValidSeekInterval(15), isTrue);
-      expect(SettingsService.isValidSeekInterval(300), isTrue);
-      expect(SettingsService.isValidSeekInterval(0), isFalse);
-      expect(SettingsService.isValidSeekInterval(-5), isFalse);
-      expect(SettingsService.isValidSeekInterval(301), isFalse);
-      expect(SettingsService.isValidSeekInterval(null), isFalse);
+      expect(AppSettings.isValidSeekInterval(1), isTrue);
+      expect(AppSettings.isValidSeekInterval(15), isTrue);
+      expect(AppSettings.isValidSeekInterval(300), isTrue);
+      expect(AppSettings.isValidSeekInterval(0), isFalse);
+      expect(AppSettings.isValidSeekInterval(-5), isFalse);
+      expect(AppSettings.isValidSeekInterval(301), isFalse);
+      expect(AppSettings.isValidSeekInterval(null), isFalse);
     });
 
     test('stored values outside the range fall back to 10', () {
-      expect(SettingsService.sanitizeSeekInterval(null), 10);
-      expect(SettingsService.sanitizeSeekInterval(0), 10);
-      expect(SettingsService.sanitizeSeekInterval(-1), 10);
-      expect(SettingsService.sanitizeSeekInterval(1000), 10);
-      expect(SettingsService.sanitizeSeekInterval(5), 5);
-      expect(SettingsService.sanitizeSeekInterval(45), 45);
+      expect(AppSettings.sanitizeSeekInterval(null), 10);
+      expect(AppSettings.sanitizeSeekInterval(0), 10);
+      expect(AppSettings.sanitizeSeekInterval(-1), 10);
+      expect(AppSettings.sanitizeSeekInterval(1000), 10);
+      expect(AppSettings.sanitizeSeekInterval(5), 5);
+      expect(AppSettings.sanitizeSeekInterval(45), 45);
     });
 
     test('parses custom input', () {
-      expect(SettingsService.parseSeekInterval('7'), 7);
-      expect(SettingsService.parseSeekInterval(' 120 '), 120);
-      expect(SettingsService.parseSeekInterval('300'), 300);
-      expect(SettingsService.parseSeekInterval(''), isNull);
-      expect(SettingsService.parseSeekInterval('0'), isNull);
-      expect(SettingsService.parseSeekInterval('301'), isNull);
-      expect(SettingsService.parseSeekInterval('-5'), isNull);
-      expect(SettingsService.parseSeekInterval('1.5'), isNull);
-      expect(SettingsService.parseSeekInterval('abc'), isNull);
+      expect(AppSettings.parseSeekInterval('7'), 7);
+      expect(AppSettings.parseSeekInterval(' 120 '), 120);
+      expect(AppSettings.parseSeekInterval('300'), 300);
+      expect(AppSettings.parseSeekInterval(''), isNull);
+      expect(AppSettings.parseSeekInterval('0'), isNull);
+      expect(AppSettings.parseSeekInterval('301'), isNull);
+      expect(AppSettings.parseSeekInterval('-5'), isNull);
+      expect(AppSettings.parseSeekInterval('1.5'), isNull);
+      expect(AppSettings.parseSeekInterval('abc'), isNull);
     });
 
     test('labels presets plainly and other values as custom', () {
-      expect(SettingsService.seekIntervalLabel(5), '5 seconds');
-      expect(SettingsService.seekIntervalLabel(15), '15 seconds');
-      expect(SettingsService.seekIntervalLabel(60), '60 seconds');
-      expect(SettingsService.seekIntervalLabel(7), 'Custom (7 seconds)');
-      expect(SettingsService.seekIntervalLabel(1), 'Custom (1 second)');
+      expect(AppSettings.seekIntervalLabel(5), '5 seconds');
+      expect(AppSettings.seekIntervalLabel(15), '15 seconds');
+      expect(AppSettings.seekIntervalLabel(60), '60 seconds');
+      expect(AppSettings.seekIntervalLabel(7), 'Custom (7 seconds)');
+      expect(AppSettings.seekIntervalLabel(1), 'Custom (1 second)');
     });
 
     test('presets include 5, 10 and 15 seconds and are all valid', () {
-      expect(SettingsService.seekIntervalPresets, containsAll([5, 10, 15]));
+      expect(AppSettings.seekIntervalPresets, containsAll([5, 10, 15]));
       expect(
-        SettingsService.seekIntervalPresets.every(
-          SettingsService.isValidSeekInterval,
+        AppSettings.seekIntervalPresets.every(
+          AppSettings.isValidSeekInterval,
         ),
         isTrue,
       );

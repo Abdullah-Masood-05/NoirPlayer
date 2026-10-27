@@ -5,7 +5,7 @@ class PlaylistSong {
   final String data;
   final int? duration;
 
-  PlaylistSong({
+  const PlaylistSong({
     required this.id,
     required this.title,
     required this.artist,
@@ -30,17 +30,29 @@ class PlaylistSong {
   );
 }
 
+/// An immutable playlist. Changes go through `PlaylistsNotifier`, which
+/// replaces the playlist with an updated copy so watchers rebuild.
 class PlaylistModel {
   final String name;
-  List<PlaylistSong> songs;
+  final List<PlaylistSong> songs;
   final bool isFavourite; // mark favorites
   final int maxSongs; // maximum allowed songs
+
   PlaylistModel({
     required this.name,
-    required this.songs,
+    required List<PlaylistSong> songs,
     this.isFavourite = false,
     this.maxSongs = 5,
-  });
+  }) : songs = List.unmodifiable(songs);
+
+  bool contains(int songId) => songs.any((s) => s.id == songId);
+
+  PlaylistModel copyWith({List<PlaylistSong>? songs}) => PlaylistModel(
+    name: name,
+    songs: songs ?? this.songs,
+    isFavourite: isFavourite,
+    maxSongs: maxSongs,
+  );
 
   Map<String, dynamic> toJson() => {
     'name': name,

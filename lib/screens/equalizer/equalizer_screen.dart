@@ -1,20 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart'
     show AndroidEqualizer, AndroidEqualizerParameters, AndroidEqualizerBand;
 
-import '../../core/services/audio_handler.dart';
-import '../../core/services/settings_service.dart';
+import '../../core/state/playback.dart';
+import '../../core/state/settings.dart';
 import '../../core/theme/app_theme.dart';
 
 /// Native Android equalizer UI (just_audio's `AndroidEqualizer`).
-class EqualizerScreen extends StatelessWidget {
+class EqualizerScreen extends ConsumerWidget {
   const EqualizerScreen({super.key});
 
-  AndroidEqualizer get _eq => (audioHandler as AudioPlayerHandler).equalizer;
-
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final eq = ref.watch(audioHandlerProvider)?.equalizer;
+    final settings = ref.read(settingsProvider.notifier);
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
@@ -28,23 +29,27 @@ class EqualizerScreen extends StatelessWidget {
           child: Column(
             children: [
               const SizedBox(height: kToolbarHeight),
-              StreamBuilder<bool>(
-                stream: _eq.enabledStream,
-                builder: (context, snap) {
-                  final enabled = snap.data ?? false;
-                  return SwitchListTile(
-                    secondary: const Icon(Icons.graphic_eq),
-                    title: const Text('Enable equalizer'),
-                    value: enabled,
-                    onChanged: (v) {
-                      _eq.setEnabled(v);
-                      SettingsService.instance.setEqualizerEnabled(v);
-                    },
-                  );
-                },
-              ),
-              const Divider(height: 1),
-              Expanded(child: _body(theme)),
+              if (eq == null)
+                Expanded(child: _hint(theme, 'The equalizer is not available.'))
+              else ...[
+                StreamBuilder<bool>(
+                  stream: eq.enabledStream,
+                  builder: (context, snap) {
+                    final enabled = snap.data ?? false;
+                    return SwitchListTile(
+                      secondary: const Icon(Icons.graphic_eq),
+                      title: const Text('Enable equalizer'),
+                      value: enabled,
+                      onChanged: (v) {
+                        eq.setEnabled(v);
+                        settings.setEqualizerEnabled(v);
+                      },
+                    );
+                  },
+                ),
+                const Divider(height: 1),
+                Expanded(child: _body(theme, eq, settings)),
+              ],
             ],
           ),
         ),
@@ -52,9 +57,13 @@ class EqualizerScreen extends StatelessWidget {
     );
   }
 
-  Widget _body(ThemeData theme) {
+  Widget _body(
+    ThemeData theme,
+    AndroidEqualizer eq,
+    SettingsNotifier settings,
+  ) {
     return FutureBuilder<AndroidEqualizerParameters>(
-      future: _eq.parameters,
+      future: eq.parameters,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
           return _hint(theme, 'Start playing a track to load the equalizer.');
@@ -64,7 +73,7 @@ class EqualizerScreen extends StatelessWidget {
         }
         final params = snapshot.data!;
         return StreamBuilder<bool>(
-          stream: _eq.enabledStream,
+          stream: eq.enabledStream,
           builder: (context, enabledSnap) {
             final enabled = enabledSnap.data ?? false;
             return Column(
@@ -77,13 +86,19 @@ class EqualizerScreen extends StatelessWidget {
                       children: [
                         for (final band in params.bands)
                           Expanded(
-                            child: _bandColumn(theme, params, band, enabled),
+                            child: _bandColumn(
+                              theme,
+                              params,
+                              band,
+                              enabled,
+                              settings,
+                            ),
                           ),
                       ],
                     ),
                   ),
                 ),
-                _presets(theme, params, enabled),
+                _presets(theme, params, eq, settings),
                 const SizedBox(height: 12),
               ],
             );
@@ -98,6 +113,7 @@ class EqualizerScreen extends StatelessWidget {
     AndroidEqualizerParameters params,
     AndroidEqualizerBand band,
     bool enabled,
+    SettingsNotifier settings,
   ) {
     return StreamBuilder<double>(
       stream: band.gainStream,
@@ -119,12 +135,17 @@ class EqualizerScreen extends StatelessWidget {
                   max: params.maxDecibels,
                   value: gain,
                   onChanged: enabled ? (v) => band.setGain(v) : null,
-                  onChangeEnd: enabled ? (_) => _persist(params) : null,
+                  onChangeEnd: enabled
+                      ? (_) => _persist(params, settings)
+                      : null,
                 ),
               ),
             ),
             const SizedBox(height: 6),
-            Text(_formatFreq(band.centerFrequency), style: theme.textTheme.bodySmall),
+            Text(
+              _formatFreq(band.centerFrequency),
+              style: theme.textTheme.bodySmall,
+            ),
           ],
         );
       },
@@ -134,7 +155,8 @@ class EqualizerScreen extends StatelessWidget {
   Widget _presets(
     ThemeData theme,
     AndroidEqualizerParameters params,
-    bool enabled,
+    AndroidEqualizer eq,
+    SettingsNotifier settings,
   ) {
     const presets = ['Flat', 'Bass', 'Vocal', 'Treble'];
     return Wrap(
@@ -145,32 +167,31 @@ class EqualizerScreen extends StatelessWidget {
         for (final p in presets)
           ActionChip(
             label: Text(p),
-            onPressed: () => _applyPreset(params, p),
+            onPressed: () => _applyPreset(params, eq, settings, p),
           ),
       ],
     );
   }
 
-  void _applyPreset(AndroidEqualizerParameters params, String preset) {
+  void _applyPreset(
+    AndroidEqualizerParameters params,
+    AndroidEqualizer eq,
+    SettingsNotifier settings,
+    String preset,
+  ) {
     final max = params.maxDecibels;
     for (final band in params.bands) {
       final f = band.centerFrequency;
       double g;
       switch (preset) {
         case 'Bass':
-          g = f < 250
-              ? max * 0.7
-              : (f < 900 ? max * 0.25 : 0);
+          g = f < 250 ? max * 0.7 : (f < 900 ? max * 0.25 : 0);
           break;
         case 'Treble':
-          g = f > 4000
-              ? max * 0.7
-              : (f > 1500 ? max * 0.25 : 0);
+          g = f > 4000 ? max * 0.7 : (f > 1500 ? max * 0.25 : 0);
           break;
         case 'Vocal':
-          g = (f >= 500 && f <= 4000)
-              ? max * 0.5
-              : (f < 250 ? -max * 0.15 : 0);
+          g = (f >= 500 && f <= 4000) ? max * 0.5 : (f < 250 ? -max * 0.15 : 0);
           break;
         default: // Flat
           g = 0;
@@ -178,15 +199,13 @@ class EqualizerScreen extends StatelessWidget {
       band.setGain(g.clamp(params.minDecibels, params.maxDecibels).toDouble());
     }
     // Applying a preset implies the user wants the EQ active.
-    _eq.setEnabled(true);
-    SettingsService.instance.setEqualizerEnabled(true);
-    _persist(params);
+    eq.setEnabled(true);
+    settings.setEqualizerEnabled(true);
+    _persist(params, settings);
   }
 
-  void _persist(AndroidEqualizerParameters params) {
-    SettingsService.instance.setEqualizerBandGains(
-      params.bands.map((b) => b.gain).toList(),
-    );
+  void _persist(AndroidEqualizerParameters params, SettingsNotifier settings) {
+    settings.setEqualizerBandGains(params.bands.map((b) => b.gain).toList());
   }
 
   Widget _hint(ThemeData theme, String text) {
@@ -202,7 +221,11 @@ class EqualizerScreen extends StatelessWidget {
               color: theme.colorScheme.onSurface.withValues(alpha: 0.25),
             ),
             const SizedBox(height: 16),
-            Text(text, textAlign: TextAlign.center, style: theme.textTheme.bodyMedium),
+            Text(
+              text,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium,
+            ),
           ],
         ),
       ),

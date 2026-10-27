@@ -1,14 +1,16 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:on_audio_query/on_audio_query.dart' show OnAudioQuery;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/discovered_track.dart';
+import '../state/library.dart';
+import '../state/settings.dart';
 import 'discover_api.dart';
-import 'settings_service.dart';
 
 /// Outcome of a download attempt.
 enum DownloadResult {
@@ -20,28 +22,48 @@ enum DownloadResult {
   permissionDenied,
 }
 
+/// The app's Discover service. Reads the keys and music folder from Settings
+/// on every call, so a change there applies straight away.
+final musicDiscoveryServiceProvider = Provider<MusicDiscoveryService>((ref) {
+  final client = http.Client();
+  ref.onDispose(client.close);
+  return MusicDiscoveryService(
+    keys: () {
+      final settings = ref.read(settingsProvider);
+      return DiscoverKeys(
+        lastFm: settings.lastFmApiKey,
+        youtube: settings.youtubeApiKey,
+        rapidApi: settings.rapidApiKey,
+      );
+    },
+    musicFolder: () => ref.read(settingsProvider).musicFolderPath,
+    audioQuery: ref.read(onAudioQueryProvider),
+    client: client,
+  );
+});
+
 class MusicDiscoveryService {
-  static final MusicDiscoveryService _instance =
-      MusicDiscoveryService._internal();
-  factory MusicDiscoveryService() => _instance;
-  MusicDiscoveryService._internal();
+  MusicDiscoveryService({
+    required DiscoverKeys Function() keys,
+    required String? Function() musicFolder,
+    required OnAudioQuery audioQuery,
+    required http.Client client,
+  }) : _api = DiscoverApi(keys: keys, client: client),
+       _musicFolder = musicFolder,
+       _audioQuery = audioQuery,
+       _client = client;
 
-  /// Discover's requests. Reads the keys from Settings on every call, so a
-  /// key entered or cleared there applies straight away.
-  final DiscoverApi _api = DiscoverApi(keys: _savedKeys);
+  /// Discover's requests.
+  final DiscoverApi _api;
 
-  static DiscoverKeys _savedKeys() {
-    final settings = SettingsService.instance;
-    return DiscoverKeys(
-      lastFm: settings.lastFmApiKey,
-      youtube: settings.youtubeApiKey,
-      rapidApi: settings.rapidApiKey,
-    );
-  }
+  final String? Function() _musicFolder;
+
+  /// Shared with the API; also streams the downloads.
+  final http.Client _client;
 
   /// Used to register freshly downloaded files with the media library so they
   /// appear in the Library/Music tab (and other apps) immediately.
-  final OnAudioQuery _audioQuery = OnAudioQuery();
+  final OnAudioQuery _audioQuery;
 
   static const String _downloadedPrefsKey = 'downloaded_track_keys';
 
@@ -190,7 +212,7 @@ class MusicDiscoveryService {
       final docDir = await getApplicationDocumentsDirectory();
       return '${docDir.path}/NoirPlayerDownloads';
     }
-    final custom = SettingsService.instance.musicFolderPath;
+    final custom = _musicFolder();
     if (custom != null && custom.trim().isNotEmpty) return custom;
     return _defaultMusicDirectory();
   }
@@ -239,19 +261,7 @@ class MusicDiscoveryService {
         } while (await File(filePath).exists());
       }
 
-      await Dio().download(
-        url,
-        filePath,
-        options: Options(
-          followRedirects: true,
-          // Only accept successful responses; otherwise an error page would be
-          // saved as a corrupt .mp3 file.
-          validateStatus: (status) =>
-              status != null && status >= 200 && status < 300,
-        ),
-        onReceiveProgress: (received, total) =>
-            onProgress?.call(received, total),
-      );
+      await _download(url, filePath, onProgress);
 
       // Make the new file visible in the media library straight away
       // (Android only; on iOS the file stays in the app's sandbox).
@@ -268,6 +278,39 @@ class MusicDiscoveryService {
       _logError('Error saving file: $e');
       return null;
     }
+  }
+
+  /// Streams [url] into [filePath], reporting progress. Only a successful
+  /// response is saved; otherwise an error page would end up as a corrupt
+  /// .mp3. A partial file is removed if the download fails.
+  Future<void> _download(
+    String url,
+    String filePath,
+    Function(int received, int total)? onProgress,
+  ) async {
+    final response = await _client.send(http.Request('GET', Uri.parse(url)));
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      await response.stream.drain<void>();
+      throw HttpException('HTTP ${response.statusCode}', uri: Uri.parse(url));
+    }
+
+    final total = response.contentLength ?? -1;
+    final file = File(filePath);
+    final sink = file.openWrite();
+    var received = 0;
+    try {
+      await for (final chunk in response.stream) {
+        sink.add(chunk);
+        received += chunk.length;
+        onProgress?.call(received, total);
+      }
+      await sink.flush();
+    } catch (_) {
+      await sink.close();
+      if (await file.exists()) await file.delete();
+      rethrow;
+    }
+    await sink.close();
   }
 
   // ---------------------------------------------------------------------------
@@ -289,9 +332,5 @@ class MusicDiscoveryService {
 
   void _logError(String message) {
     if (kDebugMode) debugPrint(message);
-  }
-
-  void dispose() {
-    // Cleanup if needed
   }
 }

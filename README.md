@@ -72,7 +72,7 @@ Noir Player is a small, focused Flutter app that:
 | Feature | Where | How it works |
 |---|---|---|
 | 🎼 **Tabbed Library** | `library_screen.dart` | Music / Audio / Albums / Artists via `on_audio_query` |
-| ▶️ **Now Playing** | `player_screen.dart` | Reactive UI bound to `audioHandler.mediaItem` & `playbackState` |
+| ▶️ **Now Playing** | `player_screen.dart` | Reactive UI bound to the now-playing and playback-state providers |
 | 🔊 **Background Playback** | `audio_handler.dart` | `audio_service` + `just_audio` with a standard media notification (title, artist, cover art) that the lock screen, Samsung Now Bar and other system media controls show |
 | 🧭 **Discover** | `discover_screen.dart` | Trending + search with album art, through Noir Player's server or your own keys |
 | ⬇️ **Download** | `music_discovery_service.dart` | Resolves YouTube → MP3 and saves straight into your Music folder, with duplicate‑download protection |
@@ -172,17 +172,22 @@ A **4‑tab bottom bar** plus a **hamburger drawer** for everything else:
 
 ```
 lib/
-├── main.dart                      # App entry — loads settings, inits audio service
+├── main.dart                      # App entry — loads settings + playlists, inits audio, ProviderScope
 ├── core/
 │   ├── models/
-│   │   ├── playlist_model.dart
+│   │   ├── playlist_model.dart          # Immutable playlists
 │   │   └── discovered_track.dart        # Discover/download track model
 │   ├── services/
 │   │   ├── audio_handler.dart           # Background audio, media controls, interruptions
 │   │   ├── discover_api.dart            # Discover requests: Noir Player's server or your own keys
-│   │   ├── music_discovery_service.dart # Last.fm + YouTube + MP3 download
-│   │   ├── settings_service.dart        # Persisted user preferences
-│   │   └── sleep_timer_service.dart     # Auto‑stop timer
+│   │   └── music_discovery_service.dart # Last.fm + YouTube + MP3 download
+│   ├── state/                           # Riverpod providers
+│   │   ├── settings.dart                # Persisted user preferences
+│   │   ├── playlists.dart               # Playlists + Favourites, saved to playlists.json
+│   │   ├── playback.dart                # Audio handler + now-playing / position streams
+│   │   ├── library.dart                 # Media access, songs / albums / artists (queried once)
+│   │   ├── artwork.dart                 # In-memory artwork cache
+│   │   └── sleep_timer.dart             # Auto‑stop timer
 │   └── theme/
 │       └── app_theme.dart
 ├── screens/
@@ -195,6 +200,8 @@ lib/
 │   ├── settings/settings_screen.dart    # Sectioned settings
 │   └── about/about_screen.dart
 └── widgets/
+    ├── mini_player.dart           # Now-playing bar above the navigation
+    ├── song_artwork.dart          # Cached artwork (device and web)
     └── playback_menus.dart        # Sleep‑timer & playback‑speed bottom sheets
 ```
 
@@ -299,7 +306,7 @@ flutter build appbundle --release            # build/app/outputs/bundle/release/
 ```
 
 **Download flow:** pick a track → look up its YouTube video ID → resolve an MP3 URL
-(RapidAPI) → stream-download the MP3 straight from that link with `dio` (with progress) →
+(RapidAPI) → stream-download the MP3 straight from that link with `http` (with progress) →
 save to the device's Music folder. The lookup and resolve steps run through Noir Player's
 server, or directly with your own key for any service you added one for in Settings.
 
@@ -309,13 +316,14 @@ server, or directly with your own key for any service you added one for in Setti
 
 | File | Responsibility |
 |---|---|
-| `main.dart` | Loads settings, initialises the audio service, sets up theming & routes |
+| `main.dart` | Loads settings and playlists, initialises the audio service, sets up the `ProviderScope`, theming & routes |
+| `core/state/` | Riverpod providers. Widgets watch only the values they show (e.g. play/pause, one song's heart), so a change rebuilds just those widgets |
 | `audio_handler.dart` | Wraps `audio_service` + `just_audio` for background playback and notifications |
 | `library_screen.dart` | Tabbed local library using `on_audio_query` |
 | `discover_screen.dart` | Discover UI — search, trending, preview-play, and per-track download progress |
 | `discover_api.dart` | Discover requests and response parsing — Noir Player's server, or each service directly with your own key |
 | `music_discovery_service.dart` | Last.fm metadata, YouTube lookup, RapidAPI MP3 resolution, and file saving |
-| `player_screen.dart` | Reactive "Now Playing" bound to the audio service streams |
+| `player_screen.dart` | Reactive "Now Playing" bound to the playback providers |
 
 ---
 
@@ -328,8 +336,9 @@ server, or directly with your own key for any service you added one for in Setti
 | [`audio_session`](https://pub.dev/packages/audio_session) | Audio focus & call/headset interruptions |
 | [`on_audio_query`](https://pub.dev/packages/on_audio_query) | Read the device's music library & artwork |
 | [`permission_handler`](https://pub.dev/packages/permission_handler) | Runtime permissions |
-| [`provider`](https://pub.dev/packages/provider) · [`shared_preferences`](https://pub.dev/packages/shared_preferences) | State & persistence |
-| [`http`](https://pub.dev/packages/http) · [`dio`](https://pub.dev/packages/dio) | Networking & file download |
+| [`flutter_riverpod`](https://pub.dev/packages/flutter_riverpod) · [`shared_preferences`](https://pub.dev/packages/shared_preferences) | State & persistence |
+| [`http`](https://pub.dev/packages/http) | Networking & file download |
+| [`cached_network_image`](https://pub.dev/packages/cached_network_image) | Discover artwork, cached between launches |
 | [`path_provider`](https://pub.dev/packages/path_provider) | Locating device folders for downloads |
 | [`flutter_animate`](https://pub.dev/packages/flutter_animate) | UI animations |
 

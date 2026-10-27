@@ -34,13 +34,14 @@ dependencies:
   audio_service: ^0.18.18
   on_audio_query: ^2.9.0
   permission_handler: ^12.0.1
-  provider: ^6.1.2
+  # App state: settings, playlists, playback and library providers.
+  flutter_riverpod: ^3.0.0
   shared_preferences: ^2.5.3
   audio_session: ^0.2.2
-  rxdart: ^0.27.7
-  # Download (Discover) module dependencies
+  # Discover API calls and downloads.
   http: ^1.1.0
-  dio: ^5.2.0
+  # Disk + memory cache for remote (Discover) artwork.
+  cached_network_image: ^3.4.1
   path_provider: ^2.1.2
   flutter_animate: ^4.5.0
   # App version / build number for the About screen. 8.x: 9.x+ needs

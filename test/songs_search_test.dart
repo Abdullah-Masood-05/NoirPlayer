@@ -3,8 +3,11 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:noir_player/core/state/settings.dart';
 import 'package:noir_player/screens/library/tabs/songs_tab.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -33,9 +36,14 @@ void main() {
   });
 
   testWidgets('clear button empties the search field', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(body: SongsTab(onNavigateToPlayer: () {})),
+      ProviderScope(
+        overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+        child: MaterialApp(
+          home: Scaffold(body: SongsTab(onNavigateToPlayer: () {})),
+        ),
       ),
     );
     await tester.pump();

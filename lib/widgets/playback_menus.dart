@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../core/services/audio_handler.dart';
-import '../core/services/settings_service.dart';
-import '../core/services/sleep_timer_service.dart';
+import '../core/state/playback.dart';
+import '../core/state/settings.dart';
+import '../core/state/sleep_timer.dart';
 
 String formatTimerDuration(Duration d) {
   if (d.inHours >= 1) {
@@ -25,9 +26,9 @@ Future<void> showSleepTimerSheet(BuildContext context) {
     showDragHandle: true,
     builder: (sheetContext) {
       return SafeArea(
-        child: ValueListenableBuilder<Duration?>(
-          valueListenable: SleepTimerService.instance.remaining,
-          builder: (context, remaining, _) {
+        child: Consumer(
+          builder: (context, ref, _) {
+            final remaining = ref.watch(sleepTimerProvider);
             return Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -47,7 +48,7 @@ Future<void> showSleepTimerSheet(BuildContext context) {
                       icon: const Icon(Icons.close),
                       label: const Text('Cancel'),
                       onPressed: () {
-                        SleepTimerService.instance.cancel();
+                        ref.read(sleepTimerProvider.notifier).cancel();
                         Navigator.pop(sheetContext);
                       },
                     ),
@@ -62,10 +63,9 @@ Future<void> showSleepTimerSheet(BuildContext context) {
                         ActionChip(
                           label: Text('$minutes min'),
                           onPressed: () {
-                            SleepTimerService.instance.start(
-                              Duration(minutes: minutes),
-                              () => audioHandler.pause(),
-                            );
+                            ref
+                                .read(sleepTimerProvider.notifier)
+                                .start(Duration(minutes: minutes));
                             Navigator.pop(sheetContext);
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
@@ -98,10 +98,11 @@ Future<void> showPlaybackSpeedSheet(BuildContext context) {
     showDragHandle: true,
     builder: (sheetContext) {
       return SafeArea(
-        child: ListenableBuilder(
-          listenable: SettingsService.instance,
-          builder: (context, _) {
-            final current = SettingsService.instance.playbackSpeed;
+        child: Consumer(
+          builder: (context, ref, _) {
+            final current = ref.watch(
+              settingsProvider.select((s) => s.playbackSpeed),
+            );
             return Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -117,7 +118,14 @@ Future<void> showPlaybackSpeedSheet(BuildContext context) {
                   groupValue: current,
                   onChanged: (value) {
                     if (value != null) {
-                      (audioHandler as AudioPlayerHandler).setSpeed(value);
+                      final handler = ref.read(audioHandlerProvider);
+                      if (handler != null) {
+                        handler.setSpeed(value);
+                      } else {
+                        ref
+                            .read(settingsProvider.notifier)
+                            .setPlaybackSpeed(value);
+                      }
                     }
                     Navigator.pop(sheetContext);
                   },
