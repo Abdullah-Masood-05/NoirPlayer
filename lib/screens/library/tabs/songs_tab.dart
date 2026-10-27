@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:on_audio_query/on_audio_query.dart' hide PlaylistModel;
 
@@ -28,6 +29,7 @@ class SongsTab extends ConsumerStatefulWidget {
 class _SongsTabState extends ConsumerState<SongsTab>
     with AutomaticKeepAliveClientMixin {
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   String _searchText = '';
 
   // The last filter result, reused until the songs or the query change.
@@ -49,7 +51,22 @@ class _SongsTabState extends ConsumerState<SongsTab>
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  /// New search text: show the results from the top.
+  void _setSearch(String value) {
+    setState(() => _searchText = value);
+    if (_scrollController.hasClients) _scrollController.jumpTo(0);
+  }
+
+  Future<void> _playAll(List<SongModel> songs, {required bool shuffle}) async {
+    final handler = ref.read(audioHandlerProvider);
+    if (handler == null || songs.isEmpty) return;
+    HapticFeedback.lightImpact();
+    widget.onNavigateToPlayer();
+    await handler.playAll(songs, shuffle: shuffle);
   }
 
   List<SongModel> _filter(List<SongModel> songs) {
@@ -298,7 +315,7 @@ class _SongsTabState extends ConsumerState<SongsTab>
                         ),
                         onPressed: () {
                           _searchController.clear();
-                          setState(() => _searchText = '');
+                          _setSearch('');
                         },
                       )
                     : null,
@@ -308,7 +325,7 @@ class _SongsTabState extends ConsumerState<SongsTab>
                   vertical: 14,
                 ),
               ),
-              onChanged: (value) => setState(() => _searchText = value),
+              onChanged: _setSearch,
             ),
           ),
         ),
@@ -378,27 +395,46 @@ class _SongsTabState extends ConsumerState<SongsTab>
       );
     }
 
-    return RefreshIndicator(
-      color: theme.colorScheme.primary,
-      onRefresh: () => ref.refresh(librarySongsProvider.future),
-      child: ListView.builder(
-        physics: const BouncingScrollPhysics(
-          parent: AlwaysScrollableScrollPhysics(),
+    return Column(
+      children: [
+        _ListHeader(
+          count: filteredSongs.length,
+          onPlay: () => _playAll(filteredSongs, shuffle: false),
+          onShuffle: () => _playAll(filteredSongs, shuffle: true),
         ),
-        cacheExtent: 500,
-        itemCount: filteredSongs.length,
-        itemBuilder: (context, index) {
-          final song = filteredSongs[index];
-          return _SongTile(
-            key: ValueKey(song.id),
-            song: song,
-            animationIndex: index < _animatedRows ? index : null,
-            // Queue the whole tab, not just the search results.
-            onTap: () => _play(songs, song),
-            onLongPress: () => _addSongToPlaylist(song),
-          );
-        },
-      ),
+        Expanded(
+          child: RefreshIndicator(
+            color: theme.colorScheme.primary,
+            onRefresh: () => ref.refresh(librarySongsProvider.future),
+            // Drag the thumb to move quickly through a long library.
+            child: Scrollbar(
+              controller: _scrollController,
+              interactive: true,
+              thickness: 6,
+              radius: const Radius.circular(8),
+              child: ListView.builder(
+                controller: _scrollController,
+                physics: const BouncingScrollPhysics(
+                  parent: AlwaysScrollableScrollPhysics(),
+                ),
+                cacheExtent: 500,
+                itemCount: filteredSongs.length,
+                itemBuilder: (context, index) {
+                  final song = filteredSongs[index];
+                  return _SongTile(
+                    key: ValueKey(song.id),
+                    song: song,
+                    animationIndex: index < _animatedRows ? index : null,
+                    // Queue the whole tab, not just the search results.
+                    onTap: () => _play(songs, song),
+                    onAddToPlaylist: () => _addSongToPlaylist(song),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -470,7 +506,7 @@ class _SongTile extends ConsumerWidget {
     required this.song,
     required this.animationIndex,
     required this.onTap,
-    required this.onLongPress,
+    required this.onAddToPlaylist,
   });
 
   final SongModel song;
@@ -478,7 +514,7 @@ class _SongTile extends ConsumerWidget {
   /// Position used to stagger the fade-in, or null for no animation.
   final int? animationIndex;
   final VoidCallback onTap;
-  final VoidCallback onLongPress;
+  final VoidCallback onAddToPlaylist;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -493,7 +529,7 @@ class _SongTile extends ConsumerWidget {
         splashColor: theme.colorScheme.primary.withValues(alpha: 0.1),
         highlightColor: theme.colorScheme.primary.withValues(alpha: 0.05),
         onTap: onTap,
-        onLongPress: onLongPress,
+        onLongPress: onAddToPlaylist,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
@@ -557,7 +593,8 @@ class _SongTile extends ConsumerWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      song.artist ?? 'Unknown Artist',
+                      '${song.artist ?? 'Unknown Artist'} · '
+                      '${_formatDuration(song.duration ?? 0)}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -582,44 +619,52 @@ class _SongTile extends ConsumerWidget {
                       ? theme.colorScheme.primary
                       : theme.iconTheme.color?.withValues(alpha: 0.55),
                 ),
-                onPressed: () => ref
-                    .read(playlistsProvider.notifier)
-                    .toggleFavourite(_toPlaylistSong(song)),
+                onPressed: () {
+                  HapticFeedback.selectionClick();
+                  ref
+                      .read(playlistsProvider.notifier)
+                      .toggleFavourite(_toPlaylistSong(song));
+                },
               ),
 
-              // Now-playing indicator for the current track, otherwise the
-              // duration chip.
+              // Marks the playing song.
               if (isCurrent)
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: NowPlayingIndicator(
                     color: theme.colorScheme.primary,
                     size: 18,
                   ),
-                )
-              else
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? Colors.white.withValues(alpha: 0.05)
-                        : Colors.black.withValues(alpha: 0.03),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    _formatDuration(song.duration ?? 0),
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: theme.textTheme.bodySmall?.color?.withValues(
-                        alpha: 0.8,
-                      ),
+                ),
+              PopupMenuButton<_SongAction>(
+                tooltip: 'More',
+                icon: Icon(
+                  Icons.more_vert,
+                  color: theme.iconTheme.color?.withValues(alpha: 0.55),
+                ),
+                onSelected: (action) => switch (action) {
+                  _SongAction.play => onTap(),
+                  _SongAction.addToPlaylist => onAddToPlaylist(),
+                },
+                itemBuilder: (_) => const [
+                  PopupMenuItem(
+                    value: _SongAction.play,
+                    child: ListTile(
+                      leading: Icon(Icons.play_arrow_rounded),
+                      title: Text('Play'),
+                      contentPadding: EdgeInsets.zero,
                     ),
                   ),
-                ),
+                  PopupMenuItem(
+                    value: _SongAction.addToPlaylist,
+                    child: ListTile(
+                      leading: Icon(Icons.playlist_add),
+                      title: Text('Add to playlist…'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -640,6 +685,53 @@ class _SongTile extends ConsumerWidget {
         ),
       ),
       child: row,
+    );
+  }
+}
+
+enum _SongAction { play, addToPlaylist }
+
+/// Song count with Play and Shuffle for everything currently listed.
+class _ListHeader extends StatelessWidget {
+  const _ListHeader({
+    required this.count,
+    required this.onPlay,
+    required this.onShuffle,
+  });
+
+  final int count;
+  final VoidCallback onPlay;
+  final VoidCallback onShuffle;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 12, 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              '$count song${count == 1 ? '' : 's'}',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          TextButton.icon(
+            onPressed: onShuffle,
+            icon: const Icon(Icons.shuffle_rounded, size: 20),
+            label: const Text('Shuffle'),
+          ),
+          const SizedBox(width: 4),
+          FilledButton.icon(
+            onPressed: onPlay,
+            icon: const Icon(Icons.play_arrow_rounded, size: 20),
+            label: const Text('Play'),
+            style: FilledButton.styleFrom(visualDensity: VisualDensity.compact),
+          ),
+        ],
+      ),
     );
   }
 }

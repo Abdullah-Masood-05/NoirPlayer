@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:audio_service/audio_service.dart';
@@ -37,6 +38,26 @@ Future<AudioPlayerHandler> initAudioService(ProviderContainer container) {
       rewindInterval: seekInterval,
     ),
   );
+}
+
+/// The queue in the order it will play (shuffled when shuffle is on).
+class UpNext {
+  const UpNext({
+    required this.items,
+    required this.queueIndices,
+    required this.currentPosition,
+  });
+
+  static const empty = UpNext(items: [], queueIndices: [], currentPosition: -1);
+
+  /// Songs in play order.
+  final List<MediaItem> items;
+
+  /// For each entry of [items], its index in the queue (for jumping to it).
+  final List<int> queueIndices;
+
+  /// Position of the playing song in [items], or -1.
+  final int currentPosition;
 }
 
 class AudioPlayerHandler extends BaseAudioHandler {
@@ -104,7 +125,8 @@ class AudioPlayerHandler extends BaseAudioHandler {
     // (title/artist/album + lazily-loaded artwork).
     _player.currentIndexStream.listen(
       _updateMediaItemForIndex,
-      onError: (Object e, StackTrace st) => debugPrint('❌ currentIndex error: $e'),
+      onError: (Object e, StackTrace st) =>
+          debugPrint('❌ currentIndex error: $e'),
     );
 
     // Keep the MediaItem duration in sync once just_audio knows it.
@@ -321,7 +343,8 @@ class AudioPlayerHandler extends BaseAudioHandler {
       if (!_sourceMatchesQueue) {
         final children = _songs
             .map(
-              (s) => AudioSource.uri(Uri.file(_pathOf(s)), tag: _toMediaItem(s)),
+              (s) =>
+                  AudioSource.uri(Uri.file(_pathOf(s)), tag: _toMediaItem(s)),
             )
             .toList();
         await _player.setAudioSources(
@@ -379,6 +402,42 @@ class AudioPlayerHandler extends BaseAudioHandler {
     _playIntent = true;
     await _player.play();
   }
+
+  /// Play [songs] from the start, or in a random order from a random song.
+  Future<void> playAll(List<dynamic> songs, {bool shuffle = false}) async {
+    if (songs.isEmpty) return;
+    setQueue(songs);
+    await playSongAt(shuffle ? Random().nextInt(songs.length) : 0);
+    if (shuffle) {
+      // Shuffle around the song now playing, so it stays first.
+      await _player.shuffle();
+    }
+    await _player.setShuffleModeEnabled(shuffle);
+  }
+
+  /// The queue in play order, for the player's "Up next" sheet.
+  Stream<UpNext> get upNextStream => _player.sequenceStateStream.map((state) {
+    final sequence = state.sequence;
+    final order =
+        state.shuffleModeEnabled &&
+            state.shuffleIndices.length == sequence.length
+        ? state.shuffleIndices
+        : List<int>.generate(sequence.length, (i) => i);
+    final items = <MediaItem>[];
+    final indices = <int>[];
+    for (final i in order) {
+      final tag = sequence[i].tag;
+      if (tag is MediaItem) {
+        items.add(tag);
+        indices.add(i);
+      }
+    }
+    return UpNext(
+      items: items,
+      queueIndices: indices,
+      currentPosition: indices.indexOf(state.currentIndex ?? -1),
+    );
+  });
 
   Future<void> playNext() => _player.seekToNext();
 
@@ -591,7 +650,9 @@ class AudioPlayerHandler extends BaseAudioHandler {
       await _player.setAudioSources(
         [AudioSource.uri(Uri.file(path), tag: item)],
         initialIndex: 0,
-        initialPosition: Duration(milliseconds: (data['positionMs'] ?? 0) as int),
+        initialPosition: Duration(
+          milliseconds: (data['positionMs'] ?? 0) as int,
+        ),
       );
       _initEqualizer();
       // The next library tap rebuilds the real queue.

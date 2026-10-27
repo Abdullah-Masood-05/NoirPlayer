@@ -1,5 +1,6 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart' show LoopMode;
@@ -8,6 +9,7 @@ import '../../core/state/playback.dart';
 import '../../core/state/settings.dart';
 import '../../widgets/seek_button.dart';
 import '../../widgets/song_artwork.dart';
+import '../../widgets/up_next_sheet.dart';
 
 class PlayerScreen extends ConsumerWidget {
   const PlayerScreen({super.key});
@@ -97,7 +99,11 @@ class PlayerScreen extends ConsumerWidget {
                       padding: EdgeInsets.symmetric(horizontal: 4),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [_ShuffleButton(), _RepeatButton()],
+                        children: [
+                          _ShuffleButton(),
+                          _UpNextButton(),
+                          _RepeatButton(),
+                        ],
                       ),
                     ),
                   ],
@@ -241,17 +247,28 @@ class _TransportRow extends ConsumerWidget {
         ),
         IconButton(
           iconSize: 40,
-          onPressed: handler?.playPrevious,
+          tooltip: 'Previous',
+          onPressed: () {
+            HapticFeedback.lightImpact();
+            handler?.playPrevious();
+          },
           icon: const Icon(Icons.skip_previous_rounded),
         ),
         _PlayPauseButton(
           playing: playing,
           color: theme.colorScheme.primary,
-          onPressed: () => playing ? handler?.pause() : handler?.play(),
+          onPressed: () {
+            HapticFeedback.mediumImpact();
+            playing ? handler?.pause() : handler?.play();
+          },
         ),
         IconButton(
           iconSize: 40,
-          onPressed: handler?.playNext,
+          tooltip: 'Next',
+          onPressed: () {
+            HapticFeedback.lightImpact();
+            handler?.playNext();
+          },
           icon: const Icon(Icons.skip_next_rounded),
         ),
         SeekButton(
@@ -280,6 +297,23 @@ class _ShuffleButton extends ConsumerWidget {
         color: on
             ? theme.colorScheme.primary
             : theme.iconTheme.color?.withValues(alpha: 0.5),
+      ),
+    );
+  }
+}
+
+class _UpNextButton extends StatelessWidget {
+  const _UpNextButton();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return TextButton.icon(
+      onPressed: () => showUpNextSheet(context),
+      icon: const Icon(Icons.queue_music_rounded, size: 22),
+      label: const Text('Up next'),
+      style: TextButton.styleFrom(
+        foregroundColor: theme.iconTheme.color?.withValues(alpha: 0.8),
       ),
     );
   }
@@ -404,33 +438,37 @@ class _PlayPauseButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onPressed,
-      child: Container(
-        width: 76,
-        height: 76,
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: color.withValues(alpha: 0.45),
-              blurRadius: 18,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 220),
-          transitionBuilder: (child, animation) => ScaleTransition(
-            scale: animation,
-            child: FadeTransition(opacity: animation, child: child),
+    return Semantics(
+      button: true,
+      label: playing ? 'Pause' : 'Play',
+      child: GestureDetector(
+        onTap: onPressed,
+        child: Container(
+          width: 76,
+          height: 76,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: color.withValues(alpha: 0.45),
+                blurRadius: 18,
+                offset: const Offset(0, 6),
+              ),
+            ],
           ),
-          child: Icon(
-            playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-            key: ValueKey(playing),
-            color: Colors.white,
-            size: 40,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            transitionBuilder: (child, animation) => ScaleTransition(
+              scale: animation,
+              child: FadeTransition(opacity: animation, child: child),
+            ),
+            child: Icon(
+              playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              key: ValueKey(playing),
+              color: Colors.white,
+              size: 40,
+            ),
           ),
         ),
       ),

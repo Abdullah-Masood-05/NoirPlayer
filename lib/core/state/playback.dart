@@ -69,3 +69,9 @@ final shuffleEnabledProvider = StreamProvider<bool>((ref) {
   final handler = ref.watch(audioHandlerProvider);
   return handler?.shuffleModeStream ?? Stream.value(false);
 });
+
+/// The queue in play order, for the "Up next" sheet.
+final upNextProvider = StreamProvider<UpNext>((ref) {
+  final handler = ref.watch(audioHandlerProvider);
+  return handler?.upNextStream ?? Stream.value(UpNext.empty);
+});
