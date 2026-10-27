@@ -527,10 +527,19 @@ class _SongsTabState extends ConsumerState<SongsTab>
   }
 }
 
+/// The artist tag, or "Unknown Artist" when it is missing. The media library
+/// reports a missing tag as the literal "<unknown>".
+String _artistOf(SongModel song) {
+  final artist = song.artist?.trim();
+  return artist == null || artist.isEmpty || artist == '<unknown>'
+      ? 'Unknown Artist'
+      : artist;
+}
+
 PlaylistSong _toPlaylistSong(SongModel song) => PlaylistSong(
   id: song.id,
   title: song.title,
-  artist: song.artist ?? 'Unknown Artist',
+  artist: _artistOf(song),
   data: song.data,
   duration: song.duration,
 );
@@ -655,7 +664,7 @@ class _SongTile extends ConsumerWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${song.artist ?? 'Unknown Artist'} · '
+                      '${_artistOf(song)} · '
                       '${_formatDuration(song.duration ?? 0)}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -819,7 +828,7 @@ class _GroupedSongs {
   }
 }
 
-/// "A  3 ────" heading above each letter's songs.
+/// "A  3" heading above each letter's songs.
 class _LetterHeader extends StatelessWidget {
   const _LetterHeader({super.key, required this.letter, required this.count});
 
@@ -856,14 +865,6 @@ class _LetterHeader extends StatelessWidget {
             '$count',
             style: theme.textTheme.bodySmall?.copyWith(
               fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Divider(
-              height: 1,
-              thickness: 0.6,
-              color: theme.dividerColor.withValues(alpha: 0.4),
             ),
           ),
         ],
