@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:on_audio_query/on_audio_query.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/services/settings_service.dart';
-import '../../core/services/sleep_timer_service.dart';
+import '../../core/state/library.dart';
+import '../../core/state/settings.dart';
+import '../../core/state/sleep_timer.dart';
 import '../../core/theme/app_theme.dart';
 import '../../widgets/playback_menus.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final settings = SettingsService.instance;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
+    final notifier = ref.read(settingsProvider.notifier);
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -22,192 +24,187 @@ class SettingsScreen extends StatelessWidget {
       ),
       body: Container(
         decoration: AppTheme.topFade(context),
-        child: ListenableBuilder(
-          listenable: settings,
-          builder: (context, _) {
+        child: Builder(
+          builder: (context) {
             return ListView(
               padding: EdgeInsets.only(
                 top: MediaQuery.paddingOf(context).top + kToolbarHeight,
               ),
               children: [
                 _SectionHeader('Appearance'),
-              RadioGroup<ThemeMode>(
-                groupValue: settings.themeMode,
-                onChanged: (mode) {
-                  if (mode != null) settings.setThemeMode(mode);
-                },
-                child: const Column(
-                  children: [
-                    RadioListTile<ThemeMode>(
-                      title: Text('System default'),
-                      subtitle: Text('Follow the system theme'),
-                      value: ThemeMode.system,
-                      secondary: Icon(Icons.brightness_auto),
-                    ),
-                    RadioListTile<ThemeMode>(
-                      title: Text('Light'),
-                      value: ThemeMode.light,
-                      secondary: Icon(Icons.light_mode),
-                    ),
-                    RadioListTile<ThemeMode>(
-                      title: Text('Dark'),
-                      value: ThemeMode.dark,
-                      secondary: Icon(Icons.dark_mode),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-
-              _SectionHeader('Library'),
-              ListTile(
-                leading: const Icon(Icons.folder_outlined),
-                title: const Text('Music & download folder'),
-                subtitle: Text(
-                  '${settings.musicFolderLabel} • new downloads are saved here',
-                ),
-                onTap: () => _pickMusicFolder(context, settings),
-              ),
-              const Divider(height: 1),
-
-              _SectionHeader('Playback'),
-              ListTile(
-                leading: const Icon(Icons.speed),
-                title: const Text('Playback speed'),
-                subtitle: Text(formatSpeed(settings.playbackSpeed)),
-                onTap: () => showPlaybackSpeedSheet(context),
-              ),
-              ListTile(
-                leading: const Icon(Icons.timelapse),
-                title: const Text('Seek interval'),
-                subtitle: Text(
-                  '${SettingsService.seekIntervalLabel(settings.seekIntervalSeconds)}'
-                  ' • player buttons, notification / lock screen and '
-                  'headset seek',
-                ),
-                onTap: () => _pickSeekInterval(context, settings),
-              ),
-              SwitchListTile(
-                secondary: const Icon(Icons.call),
-                title: const Text('Resume playback after a call'),
-                subtitle: const Text('Stay paused otherwise'),
-                value: settings.resumeAfterCall,
-                onChanged: settings.setResumeAfterCall,
-              ),
-              SwitchListTile(
-                secondary: const Icon(Icons.history),
-                title: const Text('Resume last song on startup'),
-                subtitle: const Text('Reopen where you left off'),
-                value: settings.resumeLastSong,
-                onChanged: settings.setResumeLastSong,
-              ),
-              SwitchListTile(
-                secondary: const Icon(Icons.swipe),
-                title: const Text('Stop on application swipe'),
-                subtitle: const Text(
-                  'Stop music when the app is swiped away from recents. '
-                  'Off: it keeps playing in the notification',
-                ),
-                value: settings.stopOnAppSwipe,
-                onChanged: settings.setStopOnAppSwipe,
-              ),
-              const Divider(height: 1),
-
-              _SectionHeader('Notification'),
-              SwitchListTile(
-                secondary: const Icon(Icons.fast_forward),
-                title: const Text('Seek buttons in notification'),
-                subtitle: const Text(
-                  'Back / forward buttons in the notification and lock '
-                  'screen. Android 13+ shows them only in the expanded media '
-                  'player, and some phones hide them. On iPhone they replace '
-                  'previous / next.',
-                ),
-                isThreeLine: true,
-                value: settings.seekButtonsInNotification,
-                onChanged: settings.setSeekButtonsInNotification,
-              ),
-              const Divider(height: 1),
-
-              _SectionHeader('Timer'),
-              ValueListenableBuilder<Duration?>(
-                valueListenable: SleepTimerService.instance.remaining,
-                builder: (context, remaining, _) => ListTile(
-                  leading: const Icon(Icons.bedtime_outlined),
-                  title: const Text('Sleep timer'),
-                  subtitle: Text(
-                    remaining != null
-                        ? 'Stops in ${formatTimerDuration(remaining)}'
-                        : 'Disabled',
+                RadioGroup<ThemeMode>(
+                  groupValue: settings.themeMode,
+                  onChanged: (mode) {
+                    if (mode != null) notifier.setThemeMode(mode);
+                  },
+                  child: const Column(
+                    children: [
+                      RadioListTile<ThemeMode>(
+                        title: Text('System default'),
+                        subtitle: Text('Follow the system theme'),
+                        value: ThemeMode.system,
+                        secondary: Icon(Icons.brightness_auto),
+                      ),
+                      RadioListTile<ThemeMode>(
+                        title: Text('Light'),
+                        value: ThemeMode.light,
+                        secondary: Icon(Icons.light_mode),
+                      ),
+                      RadioListTile<ThemeMode>(
+                        title: Text('Dark'),
+                        value: ThemeMode.dark,
+                        secondary: Icon(Icons.dark_mode),
+                      ),
+                    ],
                   ),
-                  onTap: () => showSleepTimerSheet(context),
                 ),
-              ),
-              const Divider(height: 1),
+                const Divider(height: 1),
 
-              _SectionHeader('Discover'),
-              const ListTile(
-                leading: Icon(Icons.cloud_outlined),
-                title: Text("Runs through Noir Player's server"),
-                subtitle: Text(
-                  'Optionally add your own keys below. A service with a key '
-                  'is called directly with it.',
+                _SectionHeader('Library'),
+                ListTile(
+                  leading: const Icon(Icons.folder_outlined),
+                  title: const Text('Music & download folder'),
+                  subtitle: Text(
+                    '${settings.musicFolderLabel} • new downloads are saved here',
+                  ),
+                  onTap: () => _pickMusicFolder(context, ref),
                 ),
-              ),
-              ListTile(
-                leading: const Icon(Icons.key_outlined),
-                title: const Text('Last.fm API key'),
-                subtitle: Text(_keyStatus(settings.lastFmApiKey)),
-                onTap: () => _editApiKey(
-                  context,
-                  title: 'Last.fm API key',
-                  current: settings.lastFmApiKey,
-                  save: settings.setLastFmApiKey,
+                const Divider(height: 1),
+
+                _SectionHeader('Playback'),
+                ListTile(
+                  leading: const Icon(Icons.speed),
+                  title: const Text('Playback speed'),
+                  subtitle: Text(formatSpeed(settings.playbackSpeed)),
+                  onTap: () => showPlaybackSpeedSheet(context),
                 ),
-              ),
-              ListTile(
-                leading: const Icon(Icons.key_outlined),
-                title: const Text('YouTube Data API key'),
-                subtitle: Text(_keyStatus(settings.youtubeApiKey)),
-                onTap: () => _editApiKey(
-                  context,
-                  title: 'YouTube Data API key',
-                  current: settings.youtubeApiKey,
-                  save: settings.setYoutubeApiKey,
+                ListTile(
+                  leading: const Icon(Icons.timelapse),
+                  title: const Text('Seek interval'),
+                  subtitle: Text(
+                    '${AppSettings.seekIntervalLabel(settings.seekIntervalSeconds)}'
+                    ' • player buttons, notification / lock screen and '
+                    'headset seek',
+                  ),
+                  onTap: () => _pickSeekInterval(context, settings, notifier),
                 ),
-              ),
-              ListTile(
-                leading: const Icon(Icons.key_outlined),
-                title: const Text('RapidAPI key'),
-                subtitle: Text(_keyStatus(settings.rapidApiKey)),
-                onTap: () => _editApiKey(
-                  context,
-                  title: 'RapidAPI key',
-                  current: settings.rapidApiKey,
-                  save: settings.setRapidApiKey,
+                SwitchListTile(
+                  secondary: const Icon(Icons.call),
+                  title: const Text('Resume playback after a call'),
+                  subtitle: const Text('Stay paused otherwise'),
+                  value: settings.resumeAfterCall,
+                  onChanged: notifier.setResumeAfterCall,
                 ),
-              ),
-            ],
-          );
-        },
+                SwitchListTile(
+                  secondary: const Icon(Icons.history),
+                  title: const Text('Resume last song on startup'),
+                  subtitle: const Text('Reopen where you left off'),
+                  value: settings.resumeLastSong,
+                  onChanged: notifier.setResumeLastSong,
+                ),
+                SwitchListTile(
+                  secondary: const Icon(Icons.swipe),
+                  title: const Text('Stop on application swipe'),
+                  subtitle: const Text(
+                    'Stop music when the app is swiped away from recents. '
+                    'Off: it keeps playing in the notification',
+                  ),
+                  value: settings.stopOnAppSwipe,
+                  onChanged: notifier.setStopOnAppSwipe,
+                ),
+                const Divider(height: 1),
+
+                _SectionHeader('Notification'),
+                SwitchListTile(
+                  secondary: const Icon(Icons.fast_forward),
+                  title: const Text('Seek buttons in notification'),
+                  subtitle: const Text(
+                    'Back / forward buttons in the notification and lock '
+                    'screen. Android 13+ shows them only in the expanded media '
+                    'player, and some phones hide them. On iPhone they replace '
+                    'previous / next.',
+                  ),
+                  isThreeLine: true,
+                  value: settings.seekButtonsInNotification,
+                  onChanged: notifier.setSeekButtonsInNotification,
+                ),
+                const Divider(height: 1),
+
+                _SectionHeader('Timer'),
+                Consumer(
+                  builder: (context, ref, _) {
+                    final remaining = ref.watch(sleepTimerProvider);
+                    return ListTile(
+                      leading: const Icon(Icons.bedtime_outlined),
+                      title: const Text('Sleep timer'),
+                      subtitle: Text(
+                        remaining != null
+                            ? 'Stops in ${formatTimerDuration(remaining)}'
+                            : 'Disabled',
+                      ),
+                      onTap: () => showSleepTimerSheet(context),
+                    );
+                  },
+                ),
+                const Divider(height: 1),
+
+                _SectionHeader('Discover'),
+                const ListTile(
+                  leading: Icon(Icons.cloud_outlined),
+                  title: Text("Runs through Noir Player's server"),
+                  subtitle: Text(
+                    'Optionally add your own keys below. A service with a key '
+                    'is called directly with it.',
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.key_outlined),
+                  title: const Text('Last.fm API key'),
+                  subtitle: Text(_keyStatus(settings.lastFmApiKey)),
+                  onTap: () => _editApiKey(
+                    context,
+                    title: 'Last.fm API key',
+                    current: settings.lastFmApiKey,
+                    save: notifier.setLastFmApiKey,
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.key_outlined),
+                  title: const Text('YouTube Data API key'),
+                  subtitle: Text(_keyStatus(settings.youtubeApiKey)),
+                  onTap: () => _editApiKey(
+                    context,
+                    title: 'YouTube Data API key',
+                    current: settings.youtubeApiKey,
+                    save: notifier.setYoutubeApiKey,
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.key_outlined),
+                  title: const Text('RapidAPI key'),
+                  subtitle: Text(_keyStatus(settings.rapidApiKey)),
+                  onTap: () => _editApiKey(
+                    context,
+                    title: 'RapidAPI key',
+                    current: settings.rapidApiKey,
+                    save: notifier.setRapidApiKey,
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
   }
 
-  Future<void> _pickMusicFolder(
-    BuildContext context,
-    SettingsService settings,
-  ) async {
-    final audioQuery = OnAudioQuery();
-    final songs = await audioQuery.querySongs();
-    final folders = <String>{};
-    for (final s in songs) {
-      final idx = s.data.lastIndexOf('/');
-      if (idx > 0) folders.add(s.data.substring(0, idx));
-    }
-    final sorted = folders.toList()..sort();
+  Future<void> _pickMusicFolder(BuildContext context, WidgetRef ref) async {
+    // Folders come from the song list the Library already loaded.
+    try {
+      await ref.read(librarySongsProvider.future);
+    } catch (_) {}
     if (!context.mounted) return;
+    final sorted = ref.read(songFoldersProvider);
 
     final selected = await showModalBottomSheet<String>(
       context: context,
@@ -239,11 +236,7 @@ class SettingsScreen extends StatelessWidget {
                 title: Text(
                   f.split('/').lastWhere((p) => p.isNotEmpty, orElse: () => f),
                 ),
-                subtitle: Text(
-                  f,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                subtitle: Text(f, maxLines: 1, overflow: TextOverflow.ellipsis),
                 onTap: () => Navigator.pop(ctx, f),
               ),
           ],
@@ -251,7 +244,9 @@ class SettingsScreen extends StatelessWidget {
       ),
     );
     if (selected == null) return;
-    await settings.setMusicFolderPath(selected.isEmpty ? null : selected);
+    await ref
+        .read(settingsProvider.notifier)
+        .setMusicFolderPath(selected.isEmpty ? null : selected);
   }
 
   String _keyStatus(String key) => key.isEmpty
@@ -273,12 +268,13 @@ class SettingsScreen extends StatelessWidget {
 
   Future<void> _pickSeekInterval(
     BuildContext context,
-    SettingsService settings,
+    AppSettings settings,
+    SettingsNotifier notifier,
   ) async {
     // Popped by the "Custom…" entry.
     const custom = -1;
     final current = settings.seekIntervalSeconds;
-    final isPreset = SettingsService.seekIntervalPresets.contains(current);
+    final isPreset = AppSettings.seekIntervalPresets.contains(current);
 
     final selected = await showDialog<int>(
       context: context,
@@ -291,7 +287,7 @@ class SettingsScreen extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                for (final seconds in SettingsService.seekIntervalPresets)
+                for (final seconds in AppSettings.seekIntervalPresets)
                   RadioListTile<int>(
                     title: Text('$seconds seconds'),
                     value: seconds,
@@ -305,7 +301,7 @@ class SettingsScreen extends StatelessWidget {
             title: const Text('Custom…'),
             subtitle: isPreset
                 ? null
-                : Text(SettingsService.seekIntervalLabel(current)),
+                : Text(AppSettings.seekIntervalLabel(current)),
             onTap: () => Navigator.pop(context, custom),
           ),
         ],
@@ -313,7 +309,7 @@ class SettingsScreen extends StatelessWidget {
     );
     if (selected == null) return;
     if (selected != custom) {
-      await settings.setSeekIntervalSeconds(selected);
+      await notifier.setSeekIntervalSeconds(selected);
       return;
     }
 
@@ -322,7 +318,7 @@ class SettingsScreen extends StatelessWidget {
       context: context,
       builder: (context) => _SeekIntervalDialog(initialSeconds: current),
     );
-    if (seconds != null) await settings.setSeekIntervalSeconds(seconds);
+    if (seconds != null) await notifier.setSeekIntervalSeconds(seconds);
   }
 }
 
@@ -349,16 +345,16 @@ class _SeekIntervalDialogState extends State<_SeekIntervalDialog> {
   }
 
   void _submit() {
-    final seconds = SettingsService.parseSeekInterval(_controller.text);
+    final seconds = AppSettings.parseSeekInterval(_controller.text);
     if (seconds != null) Navigator.pop(context, seconds);
   }
 
   @override
   Widget build(BuildContext context) {
-    const min = SettingsService.minSeekIntervalSeconds;
-    const max = SettingsService.maxSeekIntervalSeconds;
+    const min = AppSettings.minSeekIntervalSeconds;
+    const max = AppSettings.maxSeekIntervalSeconds;
     final text = _controller.text;
-    final valid = SettingsService.parseSeekInterval(text) != null;
+    final valid = AppSettings.parseSeekInterval(text) != null;
 
     return AlertDialog(
       title: const Text('Custom seek interval'),
@@ -408,7 +404,9 @@ class _SectionHeader extends StatelessWidget {
           fontSize: 12,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.8,
-          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55),
+          color: Theme.of(
+            context,
+          ).colorScheme.onSurface.withValues(alpha: 0.55),
         ),
       ),
     );

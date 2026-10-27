@@ -1,64 +1,59 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/playlist_model.dart';
-import '../../core/services/playlist_service.dart';
+import '../../core/state/playlists.dart';
 import '../../core/theme/app_theme.dart';
 import 'playlist_songs_screen.dart';
 
-class PlaylistsScreen extends StatelessWidget {
+class PlaylistsScreen extends ConsumerWidget {
   const PlaylistsScreen({super.key, required this.onNavigateToPlayer});
 
   final VoidCallback onNavigateToPlayer;
 
   @override
-  Widget build(BuildContext context) {
-    final service = PlaylistService.instance;
-
-    return ListenableBuilder(
-      listenable: service,
-      builder: (context, _) {
-        final playlists = service.playlists;
-        return Scaffold(
-          backgroundColor: Colors.transparent,
-          floatingActionButton: FloatingActionButton.extended(
-            onPressed: () => _createPlaylist(context, service),
-            icon: const Icon(Icons.add),
-            label: const Text('New playlist'),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final playlists = ref.watch(playlistsProvider);
+    final service = ref.read(playlistsProvider.notifier);
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _createPlaylist(context, service),
+        icon: const Icon(Icons.add),
+        label: const Text('New playlist'),
+      ),
+      body: Container(
+        decoration: AppTheme.topFade(context),
+        child: GridView.builder(
+          padding: EdgeInsets.fromLTRB(
+            12,
+            MediaQuery.paddingOf(context).top + kToolbarHeight + 8,
+            12,
+            88,
           ),
-          body: Container(
-            decoration: AppTheme.topFade(context),
-            child: GridView.builder(
-              padding: EdgeInsets.fromLTRB(
-                12,
-                MediaQuery.paddingOf(context).top + kToolbarHeight + 8,
-                12,
-                88,
-              ),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 14,
-              crossAxisSpacing: 14,
-              childAspectRatio: 0.85,
-            ),
-            itemCount: playlists.length,
-            itemBuilder: (context, index) {
-              final playlist = playlists[index];
-              return _PlaylistCard(
-                playlist: playlist,
-                onTap: () => _openPlaylist(context, playlist),
-                onDelete: playlist.isFavourite
-                    ? null
-                    : () => _confirmDelete(context, service, playlist),
-              ).animate().fadeIn(duration: 300.ms, delay: (index * 60).ms).scaleXY(
-                    begin: 0.92,
-                    curve: Curves.easeOut,
-                  );
-            },
-            ),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisSpacing: 14,
+            crossAxisSpacing: 14,
+            childAspectRatio: 0.85,
           ),
-        );
-      },
+          itemCount: playlists.length,
+          itemBuilder: (context, index) {
+            final playlist = playlists[index];
+            return _PlaylistCard(
+                  playlist: playlist,
+                  onTap: () => _openPlaylist(context, playlist),
+                  onDelete: playlist.isFavourite
+                      ? null
+                      : () => _confirmDelete(context, service, playlist),
+                )
+                .animate()
+                .fadeIn(duration: 300.ms, delay: (index * 60).ms)
+                .scaleXY(begin: 0.92, curve: Curves.easeOut);
+          },
+        ),
+      ),
     );
   }
 
@@ -67,7 +62,7 @@ class PlaylistsScreen extends StatelessWidget {
       context,
       MaterialPageRoute(
         builder: (_) => PlaylistSongsScreen(
-          playlist: playlist,
+          playlistName: playlist.name,
           onNavigateToPlayer: onNavigateToPlayer,
         ),
       ),
@@ -76,14 +71,14 @@ class PlaylistsScreen extends StatelessWidget {
 
   Future<void> _createPlaylist(
     BuildContext context,
-    PlaylistService service,
+    PlaylistsNotifier service,
   ) async {
     if (!service.canCreateMore) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
           content: Text(
-            'You can have at most ${PlaylistService.maxPlaylists} playlists',
+            'You can have at most ${PlaylistsNotifier.maxPlaylists} playlists',
           ),
         ),
       );
@@ -116,7 +111,7 @@ class PlaylistsScreen extends StatelessWidget {
     );
 
     if (name == null || name.trim().isEmpty) return;
-    final created = await service.createPlaylist(name);
+    final created = service.createPlaylist(name);
     if (context.mounted && !created) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -129,7 +124,7 @@ class PlaylistsScreen extends StatelessWidget {
 
   Future<void> _confirmDelete(
     BuildContext context,
-    PlaylistService service,
+    PlaylistsNotifier service,
     PlaylistModel playlist,
   ) async {
     final confirm = await showDialog<bool>(
@@ -151,7 +146,7 @@ class PlaylistsScreen extends StatelessWidget {
       ),
     );
     if (confirm == true) {
-      await service.deletePlaylist(playlist);
+      service.deletePlaylist(playlist);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

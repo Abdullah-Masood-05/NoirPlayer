@@ -1,236 +1,86 @@
 import 'package:flutter/material.dart';
-import 'package:noir_player/screens/player/player_screen.dart';
-import 'package:on_audio_query/on_audio_query.dart';
-import '../../artist/artist_songs_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class ArtistsTab extends StatefulWidget {
+import '../../../core/state/library.dart';
+import '../../../widgets/library_grid.dart';
+import '../../../widgets/song_artwork.dart';
+import '../../artist/artist_songs_screen.dart';
+import '../../player/player_screen.dart';
+
+class ArtistsTab extends ConsumerStatefulWidget {
   const ArtistsTab({super.key});
 
   @override
-  State<ArtistsTab> createState() => _ArtistsTabState();
+  ConsumerState<ArtistsTab> createState() => _ArtistsTabState();
 }
 
-class _ArtistsTabState extends State<ArtistsTab>
+class _ArtistsTabState extends ConsumerState<ArtistsTab>
     with AutomaticKeepAliveClientMixin {
-  final OnAudioQuery _audioQuery = OnAudioQuery();
-  bool _permissionGranted = false;
-  // Cache queries so tab switches don't re-run them (which caused lag).
-  Future<List<ArtistModel>>? _artistsFuture;
-  final Map<int, Future<SongModel?>> _firstSongFutures = {};
-
-  // Keep the tab alive so switching away doesn't dispose it (and its cached
-  // queries), which would force a re-query on return.
+  // Keep the tab alive so switching away keeps its scroll position.
   @override
   bool get wantKeepAlive => true;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkAndRequestPermissions();
-  }
-
-  Future<void> _checkAndRequestPermissions() async {
-    final granted = await _audioQuery.checkAndRequest(retryRequest: true);
-    setState(() => _permissionGranted = granted);
-  }
-
-  Future<SongModel?> _getFirstSongOfArtist(int artistId) async {
-    final songs = await _audioQuery.queryAudiosFrom(
-      AudiosFromType.ARTIST_ID,
-      artistId,
-    );
-    if (songs.isNotEmpty) return songs.first;
-    return null;
-  }
-
-  Widget _artistPlaceholder(ThemeData theme) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            theme.colorScheme.primary.withValues(alpha: 0.35),
-            theme.colorScheme.primary.withValues(alpha: 0.12),
-          ],
-        ),
-      ),
-      child: Center(
-        child: Icon(
-          Icons.person_rounded,
-          size: 80,
-          color: theme.colorScheme.primary.withValues(alpha: 0.6),
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
     super.build(context); // required by AutomaticKeepAliveClientMixin
     final theme = Theme.of(context);
 
-    if (!_permissionGranted) {
-      return Center(
-        child: Text(
-          'Please grant storage/media permission to access artists.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: theme.textTheme.bodyMedium?.color),
-        ),
+    if (ref.watch(libraryAccessProvider).value == LibraryAccess.denied) {
+      return const LibraryMessage(
+        'Please grant storage/media permission to access artists.',
       );
     }
 
-    return FutureBuilder<List<ArtistModel>>(
-      future: _artistsFuture ??= _audioQuery.queryArtists(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
+    // Each artist's cover is one of their songs' artwork, taken from the
+    // song list the Library already loaded.
+    final covers = ref.watch(artistCoverSongIdsProvider);
 
-        if (snapshot.hasError) {
-          return Center(
-            child: Text(
-              'Error loading artists: ${snapshot.error}',
-              style: TextStyle(color: theme.textTheme.bodyMedium?.color),
-            ),
-          );
-        }
-
-        final artists = snapshot.data ?? [];
-        if (artists.isEmpty) {
-          return Center(
-            child: Text(
-              'No artists found on this device',
-              style: TextStyle(color: theme.textTheme.bodyMedium?.color),
-            ),
-          );
-        }
-
-        return GridView.builder(
-          padding: const EdgeInsets.all(16),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            mainAxisSpacing: 16,
-            crossAxisSpacing: 16,
-            childAspectRatio: 0.75,
-          ),
-          itemCount: artists.length,
-          itemBuilder: (context, index) {
-            final artist = artists[index];
-
-            return TweenAnimationBuilder<double>(
-              duration: Duration(milliseconds: 300 + (index * 50)),
-              tween: Tween(begin: 0.0, end: 1.0),
-              curve: Curves.easeOutCubic,
-              builder: (context, value, child) {
-                return Transform.scale(
-                  scale: 0.8 + (0.2 * value),
-                  child: Opacity(opacity: value, child: child),
+    return ref
+        .watch(artistsProvider)
+        .when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => LibraryMessage('Error loading artists: $e'),
+          data: (artists) {
+            if (artists.isEmpty) {
+              return const LibraryMessage('No artists found on this device');
+            }
+            return LibraryGrid(
+              itemCount: artists.length,
+              itemBuilder: (context, index) {
+                final artist = artists[index];
+                final placeholder = LibraryCardPlaceholder(
+                  icon: Icons.person_rounded,
+                  color: theme.colorScheme.primary,
                 );
-              },
-              child: FutureBuilder<SongModel?>(
-                future: _firstSongFutures[artist.id] ??= _getFirstSongOfArtist(
-                  artist.id,
-                ),
-                builder: (context, songSnapshot) {
-                  final song = songSnapshot.data;
-
-                  return GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ArtistSongsScreen(
-                            artist: artist,
-                            onNavigateToPlayer: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => const PlayerScreen(),
-                                ),
-                              );
-                            },
+                final coverId = covers[artist.id];
+                return LibraryCard(
+                  title: artist.artist,
+                  subtitle:
+                      '${artist.numberOfAlbums ?? 0} albums • ${artist.numberOfTracks ?? 0} songs',
+                  artwork: coverId == null
+                      ? placeholder
+                      : SongArtwork(
+                          id: coverId,
+                          requestSize: 400,
+                          placeholder: placeholder,
+                        ),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ArtistSongsScreen(
+                        artist: artist,
+                        onNavigateToPlayer: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const PlayerScreen(),
                           ),
                         ),
-                      );
-                    },
-                    child: Card(
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(50),
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          song != null
-                              ? QueryArtworkWidget(
-                                  id: song.id,
-                                  type: ArtworkType.AUDIO,
-                                  artworkFit: BoxFit.cover,
-                                  nullArtworkWidget: _artistPlaceholder(theme),
-                                )
-                              : _artistPlaceholder(theme),
-                          Positioned(
-                            bottom: 0,
-                            left: 0,
-                            right: 0,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  colors: [
-                                    Colors.transparent,
-                                    Colors.black.withValues(alpha: 0.7),
-                                    Colors.black.withValues(alpha: 0.85),
-                                  ],
-                                ),
-                              ),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 16,
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    artist.artist,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 15,
-                                      color: Colors.white,
-                                      height: 1.2,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${artist.numberOfAlbums ?? 0} albums • ${artist.numberOfTracks ?? 0} songs',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.white.withValues(
-                                        alpha: 0.8,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
                       ),
                     ),
-                  );
-                },
-              ),
+                  ),
+                );
+              },
             );
           },
         );
-      },
-    );
   }
 }

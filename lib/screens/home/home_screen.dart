@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../library/library_screen.dart';
 import '../player/player_screen.dart';
 import '../playlists/playlists_screen.dart';
@@ -6,8 +7,8 @@ import '../discover/discover_screen.dart';
 import '../settings/settings_screen.dart';
 import '../about/about_screen.dart';
 import '../equalizer/equalizer_screen.dart';
-import '../../core/services/settings_service.dart';
-import '../../core/services/sleep_timer_service.dart';
+import '../../core/state/settings.dart';
+import '../../core/state/sleep_timer.dart';
 import '../../widgets/playback_menus.dart';
 import '../../widgets/mini_player.dart';
 
@@ -100,12 +101,15 @@ class _HomeScreenState extends State<HomeScreen>
           scrolledUnderElevation: 0,
           actions: isPlayer
               ? [
-                  ListenableBuilder(
-                    listenable: SettingsService.instance,
-                    builder: (context, _) => TextButton(
+                  Consumer(
+                    builder: (context, ref, _) => TextButton(
                       onPressed: () => showPlaybackSpeedSheet(context),
                       child: Text(
-                        formatSpeed(SettingsService.instance.playbackSpeed),
+                        formatSpeed(
+                          ref.watch(
+                            settingsProvider.select((s) => s.playbackSpeed),
+                          ),
+                        ),
                         style: TextStyle(
                           color: Theme.of(context).colorScheme.onSurface,
                           fontWeight: FontWeight.bold,
@@ -260,19 +264,21 @@ class _HomeScreenState extends State<HomeScreen>
               );
             },
           ),
-          ValueListenableBuilder<Duration?>(
-            valueListenable: SleepTimerService.instance.remaining,
-            builder: (_, remaining, __) => ListTile(
-              leading: const Icon(Icons.bedtime_outlined),
-              title: const Text('Sleep Timer'),
-              subtitle: remaining != null
-                  ? Text('Stops in ${formatTimerDuration(remaining)}')
-                  : null,
-              onTap: () {
-                Navigator.pop(context);
-                showSleepTimerSheet(context);
-              },
-            ),
+          Consumer(
+            builder: (_, ref, _) {
+              final remaining = ref.watch(sleepTimerProvider);
+              return ListTile(
+                leading: const Icon(Icons.bedtime_outlined),
+                title: const Text('Sleep Timer'),
+                subtitle: remaining != null
+                    ? Text('Stops in ${formatTimerDuration(remaining)}')
+                    : null,
+                onTap: () {
+                  Navigator.pop(context);
+                  showSleepTimerSheet(context);
+                },
+              );
+            },
           ),
           ListTile(
             leading: const Icon(Icons.info_outline),
