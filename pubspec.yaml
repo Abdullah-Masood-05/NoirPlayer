@@ -52,6 +52,12 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
 
+# Live build only: audio_service 0.18.18 with the OnePlus / Oppo / Vivo play
+# button fix (see third_party/audio_service, issue #1115). Not on main.
+dependency_overrides:
+  audio_service:
+    path: third_party/audio_service
+
 dev_dependencies:
   flutter_launcher_icons: ^0.14.4
   flutter_test:
