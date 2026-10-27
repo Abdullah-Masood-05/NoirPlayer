@@ -9,9 +9,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:noir_player/core/models/playlist_model.dart';
 import 'package:noir_player/core/state/artwork.dart';
+import 'package:noir_player/core/state/playback.dart';
 import 'package:noir_player/core/state/playlists.dart';
 import 'package:noir_player/core/state/settings.dart';
 import 'package:noir_player/core/state/sleep_timer.dart';
+import 'package:noir_player/widgets/now_playing_indicator.dart';
 import 'package:on_audio_query/on_audio_query.dart' show ArtworkType;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -293,5 +295,23 @@ void main() {
     timer.start(const Duration(minutes: 5));
     timer.cancel();
     expect(c.read(sleepTimerProvider), isNull);
+  });
+
+  testWidgets('the now-playing bars move only while playing', (tester) async {
+    Future<void> pumpWith({required bool playing}) => tester.pumpWidget(
+      ProviderScope(
+        key: ValueKey(playing),
+        overrides: [isPlayingProvider.overrideWithValue(playing)],
+        child: const MaterialApp(home: NowPlayingIndicator(color: Colors.red)),
+      ),
+    );
+
+    await pumpWith(playing: false);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(tester.hasRunningAnimations, isFalse);
+
+    await pumpWith(playing: true);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(tester.hasRunningAnimations, isTrue);
   });
 }

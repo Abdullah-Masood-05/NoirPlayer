@@ -1,24 +1,43 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Small animated equalizer bars used to mark the currently playing track.
-class NowPlayingIndicator extends StatefulWidget {
+import '../core/state/playback.dart';
+
+/// Small equalizer bars marking the current track. They move only while it
+/// is playing and hold still while paused.
+class NowPlayingIndicator extends ConsumerStatefulWidget {
   const NowPlayingIndicator({super.key, required this.color, this.size = 18});
 
   final Color color;
   final double size;
 
   @override
-  State<NowPlayingIndicator> createState() => _NowPlayingIndicatorState();
+  ConsumerState<NowPlayingIndicator> createState() =>
+      _NowPlayingIndicatorState();
 }
 
-class _NowPlayingIndicatorState extends State<NowPlayingIndicator>
+class _NowPlayingIndicatorState extends ConsumerState<NowPlayingIndicator>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 900),
-  )..repeat();
+  );
+
+  void _follow(bool playing) {
+    if (playing) {
+      if (!_controller.isAnimating) _controller.repeat();
+    } else {
+      _controller.stop();
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _follow(ref.read(isPlayingProvider));
+  }
 
   @override
   void dispose() {
@@ -28,6 +47,7 @@ class _NowPlayingIndicatorState extends State<NowPlayingIndicator>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<bool>(isPlayingProvider, (_, playing) => _follow(playing));
     final barWidth = widget.size * 0.18;
     return SizedBox(
       width: widget.size,
