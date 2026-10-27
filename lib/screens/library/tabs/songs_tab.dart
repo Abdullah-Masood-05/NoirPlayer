@@ -528,7 +528,7 @@ class _SongsTabState extends ConsumerState<SongsTab>
 }
 
 /// The artist tag, or "Unknown Artist" when it is missing. The media library
-/// reports a missing tag as the literal "<unknown>".
+/// reports a missing tag as the literal `<unknown>`.
 String _artistOf(SongModel song) {
   final artist = song.artist?.trim();
   return artist == null || artist.isEmpty || artist == '<unknown>'
