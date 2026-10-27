@@ -3,6 +3,29 @@
 Release notes for Noir Player. Each `## [x.y.z] - Title` section becomes the
 notes of the matching GitHub release.
 
+## [2.0.0] - Faster everywhere, Up next and quick play
+
+### ⚡ Faster
+- **Noir Player has been rebuilt inside for speed.** Scrolling a big library is smoother, play/pause and favourites respond instantly, and only the parts of the screen that change are redrawn.
+- **Your library loads once** and is shared by Music, Audio, Albums and Artists, so switching tabs is instant and artist covers appear without a wait.
+- **Cover art is remembered** while you scroll, so it no longer flickers back in, and Discover covers are kept between launches.
+
+### 🎵 Library
+- **The Music tab is arranged A–Z:** songs sit under letter headings (# for titles that don't start with a letter) showing how many songs each has, with every song numbered. Play, Shuffle and tapping a song follow that order.
+- **Play and Shuffle buttons** above every song list play everything shown, including search results, and show how many songs there are.
+- **Fast scroll:** drag the scroll bar to move quickly through a long library. A new search starts at the top of the results.
+- **A ⋮ menu on every song** with Play and Add to playlist, so you no longer need to know about long-press. Each song's length now sits next to its artist.
+- If Noir Player can't read your music, the Library says so with a **Try again** button instead of loading forever.
+- Songs you download in Discover **show up in the Library straight away.**
+
+### ▶️ Player
+- **Up next:** see the queue in the order it will play, shuffle included, and tap any song to jump to it.
+- **Swipe the mini player** left for the next song or right for the previous one.
+- Gentle **vibration feedback** on play/pause, skip and favourites.
+
+### 📦 Installing
+- **2.0.0 updates over 1.2.5 in place.** Your playlists and settings stay as they are.
+
 ## [1.2.5] - Rounded app icon
 
 ### 🎨 Look

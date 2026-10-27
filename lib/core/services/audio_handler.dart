@@ -1,26 +1,26 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/playlist_model.dart';
 import 'media_controls.dart';
-import 'settings_service.dart';
+import '../state/settings.dart';
 
-late final AudioHandler audioHandler;
-bool _isInitialized = false;
-
-Future<void> initAudioService() async {
-  if (_isInitialized) return;
-
-  audioHandler = await AudioService.init(
-    builder: () => AudioPlayerHandler(),
+/// Starts the audio service. The handler reads and updates settings through
+/// [container], the same container the UI uses.
+Future<AudioPlayerHandler> initAudioService(ProviderContainer container) {
+  final seekInterval = container.read(settingsProvider).seekInterval;
+  return AudioService.init(
+    builder: () => AudioPlayerHandler(container),
     config: AudioServiceConfig(
       androidNotificationChannelId: 'com.example.noir_player.channel.audio',
       androidNotificationChannelName: 'Noir Player',
@@ -34,17 +34,37 @@ Future<void> initAudioService() async {
       // The seek step comes from Settings. AudioPlayerHandler overrides
       // fastForward / rewind to read it live; this only seeds the iOS
       // lock-screen skip buttons, which pick it up on the next launch.
-      fastForwardInterval: SettingsService.instance.seekInterval,
-      rewindInterval: SettingsService.instance.seekInterval,
+      fastForwardInterval: seekInterval,
+      rewindInterval: seekInterval,
     ),
   );
-
-  _isInitialized = true;
 }
 
-bool isAudioServiceInitialized() => _isInitialized;
+/// The queue in the order it will play (shuffled when shuffle is on).
+class UpNext {
+  const UpNext({
+    required this.items,
+    required this.queueIndices,
+    required this.currentPosition,
+  });
+
+  static const empty = UpNext(items: [], queueIndices: [], currentPosition: -1);
+
+  /// Songs in play order.
+  final List<MediaItem> items;
+
+  /// For each entry of [items], its index in the queue (for jumping to it).
+  final List<int> queueIndices;
+
+  /// Position of the playing song in [items], or -1.
+  final int currentPosition;
+}
 
 class AudioPlayerHandler extends BaseAudioHandler {
+  final ProviderContainer _container;
+
+  AppSettings get _settings => _container.read(settingsProvider);
+
   // Native Android equalizer, attached to the player's audio pipeline.
   final AndroidEqualizer _equalizer = AndroidEqualizer();
   late final AudioPlayer _player = AudioPlayer(
@@ -82,9 +102,9 @@ class AudioPlayerHandler extends BaseAudioHandler {
   Stream<Duration> get positionStream => _player.positionStream;
   Stream<Duration?> get durationStream => _player.durationStream;
 
-  AudioPlayerHandler() {
+  AudioPlayerHandler(this._container) {
     _player.setLoopMode(LoopMode.all);
-    _player.setSpeed(SettingsService.instance.playbackSpeed);
+    _player.setSpeed(_settings.playbackSpeed);
     _configureAudioSession();
 
     // Periodically remember the current song + position so it can be resumed
@@ -105,7 +125,8 @@ class AudioPlayerHandler extends BaseAudioHandler {
     // (title/artist/album + lazily-loaded artwork).
     _player.currentIndexStream.listen(
       _updateMediaItemForIndex,
-      onError: (Object e, StackTrace st) => debugPrint('❌ currentIndex error: $e'),
+      onError: (Object e, StackTrace st) =>
+          debugPrint('❌ currentIndex error: $e'),
     );
 
     // Keep the MediaItem duration in sync once just_audio knows it.
@@ -125,7 +146,10 @@ class AudioPlayerHandler extends BaseAudioHandler {
 
     // Rebuild the media controls as soon as the seek settings change, not on
     // the next playback event.
-    SettingsService.instance.addListener(_onSettingsChanged);
+    _container.listen<AppSettings>(
+      settingsProvider,
+      (_, next) => _onSettingsChanged(next),
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -136,8 +160,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
   bool? _shownSeekButtons;
   int? _shownSeekSeconds;
 
-  void _onSettingsChanged() {
-    final settings = SettingsService.instance;
+  void _onSettingsChanged(AppSettings settings) {
     if (settings.seekButtonsInNotification != _shownSeekButtons ||
         settings.seekIntervalSeconds != _shownSeekSeconds) {
       _broadcastState();
@@ -146,7 +169,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
 
   void _broadcastState([PlaybackEvent? event]) {
     final playing = _player.playing;
-    final settings = SettingsService.instance;
+    final settings = _settings;
     _shownSeekButtons = settings.seekButtonsInNotification;
     _shownSeekSeconds = settings.seekIntervalSeconds;
 
@@ -320,7 +343,8 @@ class AudioPlayerHandler extends BaseAudioHandler {
       if (!_sourceMatchesQueue) {
         final children = _songs
             .map(
-              (s) => AudioSource.uri(Uri.file(_pathOf(s)), tag: _toMediaItem(s)),
+              (s) =>
+                  AudioSource.uri(Uri.file(_pathOf(s)), tag: _toMediaItem(s)),
             )
             .toList();
         await _player.setAudioSources(
@@ -378,6 +402,42 @@ class AudioPlayerHandler extends BaseAudioHandler {
     _playIntent = true;
     await _player.play();
   }
+
+  /// Play [songs] from the start, or in a random order from a random song.
+  Future<void> playAll(List<dynamic> songs, {bool shuffle = false}) async {
+    if (songs.isEmpty) return;
+    setQueue(songs);
+    await playSongAt(shuffle ? Random().nextInt(songs.length) : 0);
+    if (shuffle) {
+      // Shuffle around the song now playing, so it stays first.
+      await _player.shuffle();
+    }
+    await _player.setShuffleModeEnabled(shuffle);
+  }
+
+  /// The queue in play order, for the player's "Up next" sheet.
+  Stream<UpNext> get upNextStream => _player.sequenceStateStream.map((state) {
+    final sequence = state.sequence;
+    final order =
+        state.shuffleModeEnabled &&
+            state.shuffleIndices.length == sequence.length
+        ? state.shuffleIndices
+        : List<int>.generate(sequence.length, (i) => i);
+    final items = <MediaItem>[];
+    final indices = <int>[];
+    for (final i in order) {
+      final tag = sequence[i].tag;
+      if (tag is MediaItem) {
+        items.add(tag);
+        indices.add(i);
+      }
+    }
+    return UpNext(
+      items: items,
+      queueIndices: indices,
+      currentPosition: indices.indexOf(state.currentIndex ?? -1),
+    );
+  });
 
   Future<void> playNext() => _player.seekToNext();
 
@@ -460,10 +520,10 @@ class AudioPlayerHandler extends BaseAudioHandler {
   Future<void> seek(Duration position) => _player.seek(position);
 
   @override
-  Future<void> fastForward() => _seekBy(SettingsService.instance.seekInterval);
+  Future<void> fastForward() => _seekBy(_settings.seekInterval);
 
   @override
-  Future<void> rewind() => _seekBy(-SettingsService.instance.seekInterval);
+  Future<void> rewind() => _seekBy(-_settings.seekInterval);
 
   Future<void> _seekBy(Duration offset) async {
     final duration = _player.duration ?? Duration.zero;
@@ -477,7 +537,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
   @override
   Future<void> setSpeed(double speed) async {
     await _player.setSpeed(speed);
-    await SettingsService.instance.setPlaybackSpeed(speed);
+    await _container.read(settingsProvider.notifier).setPlaybackSpeed(speed);
   }
 
   /// Apply the saved equalizer settings once the native effect is ready
@@ -486,9 +546,9 @@ class AudioPlayerHandler extends BaseAudioHandler {
     if (_equalizerApplied) return;
     _equalizerApplied = true;
     try {
-      await _equalizer.setEnabled(SettingsService.instance.equalizerEnabled);
+      await _equalizer.setEnabled(_settings.equalizerEnabled);
       final params = await _equalizer.parameters;
-      final saved = SettingsService.instance.equalizerBandGains;
+      final saved = _settings.equalizerBandGains;
       for (var i = 0; i < params.bands.length && i < saved.length; i++) {
         await params.bands[i].setGain(saved[i]);
       }
@@ -508,7 +568,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
 
   @override
   Future<void> onTaskRemoved() async {
-    if (SettingsService.instance.stopOnAppSwipe) {
+    if (_settings.stopOnAppSwipe) {
       await stop();
     }
     await super.onTaskRemoved();
@@ -528,7 +588,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
         if (!event.begin &&
             event.type == AudioInterruptionType.pause &&
             _playIntent &&
-            SettingsService.instance.resumeAfterCall) {
+            _settings.resumeAfterCall) {
           _player.play();
         }
       });
@@ -590,7 +650,9 @@ class AudioPlayerHandler extends BaseAudioHandler {
       await _player.setAudioSources(
         [AudioSource.uri(Uri.file(path), tag: item)],
         initialIndex: 0,
-        initialPosition: Duration(milliseconds: (data['positionMs'] ?? 0) as int),
+        initialPosition: Duration(
+          milliseconds: (data['positionMs'] ?? 0) as int,
+        ),
       );
       _initEqualizer();
       // The next library tap rebuilds the real queue.
