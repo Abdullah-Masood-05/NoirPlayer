@@ -14,4 +14,4 @@ This build exists only to show Noir Player in **OnePlus / OPPO Live Alerts** (th
 - OnePlus can change its allowlist at any time, so the pill may stop appearing after a system update. OxygenOS 16 shows any music player as a Live Alert, so this build isn't needed there.
 - It doesn't receive in-place updates from the normal Noir Player releases.
 
-**This build:** a test build of Noir Player {version}: faster everywhere, the Music tab arranged A–Z with numbered songs, Play / Shuffle and fast scroll in the Library, an Up next queue in the player, and swipe-to-skip on the mini player. It updates the previous Noir Player Live build in place — same package name and signing key.
+**This build:** a test build of Noir Player {version}: faster everywhere, the Music tab arranged A–Z with numbered songs, Play / Shuffle and fast scroll in the Library, an Up next queue in the player, and swipe-to-skip on the mini player. To help fix the OnePlus media card buttons, the drawer has a **Remote controls log** that lists every play / pause / skip the app receives. It updates the previous Noir Player Live build in place — same package name and signing key.

@@ -6,6 +6,7 @@ import '../playlists/playlists_screen.dart';
 import '../discover/discover_screen.dart';
 import '../settings/settings_screen.dart';
 import '../about/about_screen.dart';
+import '../debug/remote_log_screen.dart';
 import '../equalizer/equalizer_screen.dart';
 import '../../core/state/settings.dart';
 import '../../core/state/sleep_timer.dart';
@@ -277,6 +278,18 @@ class _HomeScreenState extends State<HomeScreen>
                   Navigator.pop(context);
                   showSleepTimerSheet(context);
                 },
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.bug_report_outlined),
+            title: const Text('Remote controls log'),
+            subtitle: const Text('Live test build'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const RemoteLogScreen()),
               );
             },
           ),
