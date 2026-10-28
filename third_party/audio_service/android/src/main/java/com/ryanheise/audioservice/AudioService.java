@@ -527,6 +527,17 @@ public class AudioService extends MediaBrowserServiceCompat {
             final PlaybackStateCompat.CustomAction customAction = createCustomAction(control);
             if (customAction != null) {
                 customActions.add(customAction);
+                // Noir Player patch: keep seek (fast-forward / rewind) buttons
+                // as notification actions too. Stock Android 13+ draws media
+                // buttons from the session's custom actions, but OEM panels
+                // such as OnePlus's lock screen and Media player build them
+                // from the notification's actions, so the seek buttons were
+                // missing there.
+                if (control.customAction == null
+                        && (control.actionCode == PlaybackStateCompat.ACTION_FAST_FORWARD
+                            || control.actionCode == PlaybackStateCompat.ACTION_REWIND)) {
+                    nativeActions.add(createAction(control.icon, control.label, control.actionCode));
+                }
             } else {
                 nativeActions.add(createAction(control.icon, control.label, control.actionCode));
             }
