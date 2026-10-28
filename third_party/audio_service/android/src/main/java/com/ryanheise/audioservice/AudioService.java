@@ -358,6 +358,12 @@ public class AudioService extends MediaBrowserServiceCompat {
         return START_NOT_STICKY;
     }
 
+    /** Noir Player patch: dispatch a media button to the live session. */
+    boolean handleMediaButtonIntent(Intent intent) {
+        if (mediaSession == null) return false;
+        return MediaButtonReceiver.handleIntent(mediaSession, intent) != null;
+    }
+
     public void stop() {
         deactivateMediaSession();
         stopSelf();

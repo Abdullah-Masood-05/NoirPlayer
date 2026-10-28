@@ -72,10 +72,14 @@
             </intent-filter>
         </service>
         
-        <!-- Media Button Receiver -->
-        <receiver 
-            android:name="androidx.media.session.MediaButtonReceiver"
-            android:exported="true">
+        <!-- Media Button Receiver. Must be audio_service's own receiver: the
+             notification's play / pause / skip buttons are sent to this exact
+             class, so with any other class declared those presses were
+             dropped (OnePlus lock screen / expanded Media player use them). -->
+        <receiver
+            android:name="com.ryanheise.audioservice.MediaButtonReceiver"
+            android:exported="true"
+            tools:ignore="Instantiatable">
             <intent-filter>
                 <action android:name="android.intent.action.MEDIA_BUTTON" />
             </intent-filter>
