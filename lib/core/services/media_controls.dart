@@ -37,6 +37,9 @@ class MediaControlsSpec {
 /// On iOS the rewind / fast-forward actions turn the lock screen's previous /
 /// next buttons into skip-back / skip-forward buttons, so they are only
 /// enabled with [showSeek].
+///
+/// The seek buttons use Noir Player's own icons (a circular arrow with the
+/// seconds inside for 5, 10 and 30 s, like most players' lock screens).
 MediaControlsSpec buildMediaControls({
   required bool playing,
   required bool showSeek,
@@ -46,14 +49,14 @@ MediaControlsSpec buildMediaControls({
     MediaControl.skipToPrevious,
     if (showSeek)
       MediaControl(
-        androidIcon: MediaControl.rewind.androidIcon,
+        androidIcon: seekIconResource(seekSeconds, forward: false),
         label: 'Back $seekSeconds seconds',
         action: MediaAction.rewind,
       ),
     if (playing) MediaControl.pause else MediaControl.play,
     if (showSeek)
       MediaControl(
-        androidIcon: MediaControl.fastForward.androidIcon,
+        androidIcon: seekIconResource(seekSeconds, forward: true),
         label: 'Forward $seekSeconds seconds',
         action: MediaAction.fastForward,
       ),
@@ -78,4 +81,13 @@ MediaControlsSpec buildMediaControls({
       if (showSeek) MediaAction.rewind,
     },
   );
+}
+
+/// Android drawable for a seek button: one showing the seconds for 5, 10 and
+/// 30 s, a plain circular arrow otherwise.
+String seekIconResource(int seconds, {required bool forward}) {
+  final direction = forward ? 'forward' : 'back';
+  return const [5, 10, 30].contains(seconds)
+      ? 'drawable/noir_seek_${direction}_$seconds'
+      : 'drawable/noir_seek_$direction';
 }

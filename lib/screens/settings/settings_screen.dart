@@ -116,13 +116,14 @@ class SettingsScreen extends ConsumerWidget {
 
                 _SectionHeader('Notification'),
                 SwitchListTile(
-                  secondary: const Icon(Icons.fast_forward),
-                  title: const Text('Seek buttons in notification'),
-                  subtitle: const Text(
-                    'Back / forward buttons in the notification and lock '
-                    'screen. Android 13+ shows them only in the expanded media '
-                    'player, and some phones hide them. On iPhone they replace '
-                    'previous / next.',
+                  secondary: const Icon(Icons.forward_10),
+                  title: const Text('Seek buttons on lock screen'),
+                  subtitle: Text(
+                    'Back / forward ${settings.seekIntervalSeconds} s buttons '
+                    'beside play on the lock screen, the media notification '
+                    'and the quick-settings player (uses your seek interval). '
+                    'Some phones show them only when the player is expanded. '
+                    'On iPhone they replace previous / next.',
                   ),
                   isThreeLine: true,
                   value: settings.seekButtonsInNotification,

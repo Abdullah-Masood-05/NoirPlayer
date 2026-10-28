@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The media notification's seek icons are looked up by name
+     (drawable/noir_seek_*), so the resource shrinker must keep them. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/noir_seek_*" />

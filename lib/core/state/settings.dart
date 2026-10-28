@@ -22,7 +22,7 @@ class AppSettings {
     this.resumeAfterCall = true,
     this.resumeLastSong = true,
     this.stopOnAppSwipe = false,
-    this.seekButtonsInNotification = false,
+    this.seekButtonsInNotification = true,
     this.playbackSpeed = 1.0,
     this.seekIntervalSeconds = defaultSeekIntervalSeconds,
     this.musicFolderPath,
@@ -46,8 +46,8 @@ class AppSettings {
   /// Stop playback when the app is swiped away from recents.
   final bool stopOnAppSwipe;
 
-  /// Show back / forward seek buttons in the media notification and system
-  /// media controls.
+  /// Show back / forward seek buttons (e.g. ⟲10 / ⟳10) in the media
+  /// notification, lock screen and system media controls. On by default.
   final bool seekButtonsInNotification;
 
   /// Playback speed multiplier (0.5–2.0).
@@ -194,7 +194,7 @@ class SettingsNotifier extends Notifier<AppSettings> {
       resumeAfterCall: prefs.getBool(_kResumeAfterCall) ?? true,
       resumeLastSong: prefs.getBool(_kResumeLastSong) ?? true,
       stopOnAppSwipe: prefs.getBool(_kStopOnAppSwipe) ?? false,
-      seekButtonsInNotification: prefs.getBool(_kSeekButtons) ?? false,
+      seekButtonsInNotification: prefs.getBool(_kSeekButtons) ?? true,
       playbackSpeed: prefs.getDouble(_kPlaybackSpeed) ?? 1.0,
       seekIntervalSeconds: AppSettings.sanitizeSeekInterval(
         prefs.getInt(_kSeekInterval),
