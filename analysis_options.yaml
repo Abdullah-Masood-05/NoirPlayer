@@ -11,7 +11,7 @@ include: package:flutter_lints/flutter.yaml
 
 analyzer:
   exclude:
-    # Vendored, patched audio_service (Live build only).
+    # Vendored, patched audio_service.
     - third_party/**
 
 linter:

@@ -14,4 +14,4 @@ This build exists only to show Noir Player in **OnePlus / OPPO Live Alerts** (th
 - OnePlus can change its allowlist at any time, so the pill may stop appearing after a system update. OxygenOS 16 shows any music player as a Live Alert, so this build isn't needed there.
 - It doesn't receive in-place updates from the normal Noir Player releases.
 
-**This build:** Noir Player {version}. It includes a fix for **play, pause, next and previous doing nothing on the OnePlus lock screen and the expanded Media player** (they showed three dots instead). The drawer's **Remote controls log** lists every command the app receives, to check it. It updates the previous Noir Player Live build in place — same package name and signing key.
+**This build:** Noir Player {version}. Play, pause, next and previous now work from the lock screen and the expanded Media player. It updates the previous Noir Player Live build in place — same package name and signing key.

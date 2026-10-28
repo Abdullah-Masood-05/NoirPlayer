@@ -203,6 +203,10 @@ lib/
     ├── mini_player.dart           # Now-playing bar above the navigation
     ├── song_artwork.dart          # Cached artwork (device and web)
     └── playback_menus.dart        # Sleep‑timer & playback‑speed bottom sheets
+
+third_party/
+└── audio_service/                 # audio_service 0.18.18, patched so lock-screen and
+                                   # media-panel buttons reach the app (OnePlus / Oppo / Vivo)
 ```
 
 ---

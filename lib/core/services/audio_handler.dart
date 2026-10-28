@@ -13,7 +13,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/playlist_model.dart';
 import 'media_controls.dart';
-import '../state/remote_log.dart';
 import '../state/settings.dart';
 
 /// Starts the audio service. The handler reads and updates settings through
@@ -65,10 +64,6 @@ class AudioPlayerHandler extends BaseAudioHandler {
   final ProviderContainer _container;
 
   AppSettings get _settings => _container.read(settingsProvider);
-
-  /// Records a received command for the Live build's Remote controls log.
-  void _log(String command) =>
-      _container.read(remoteLogProvider.notifier).add(command);
 
   // Native Android equalizer, attached to the player's audio pipeline.
   final AndroidEqualizer _equalizer = AndroidEqualizer();
@@ -500,44 +495,32 @@ class AudioPlayerHandler extends BaseAudioHandler {
   // ---------------------------------------------------------------------------
 
   @override
-  Future<void> skipToNext() {
-    _log('next');
-    return _player.seekToNext();
-  }
+  Future<void> skipToNext() => _player.seekToNext();
 
   @override
-  Future<void> skipToPrevious() {
-    _log('previous');
-    return _player.seekToPrevious();
-  }
+  Future<void> skipToPrevious() => _player.seekToPrevious();
 
   @override
-  Future<void> skipToQueueItem(int index) {
-    _log('jump to queue item $index');
-    return playSongAt(index);
-  }
+  Future<void> skipToQueueItem(int index) => playSongAt(index);
 
   @override
   Future<void> play() {
-    _log('play');
     _playIntent = true;
     return _player.play();
   }
 
   @override
   Future<void> pause() {
-    _log('pause');
     _playIntent = false;
     _saveLastSong();
     return _player.pause();
   }
 
-  /// Media keys (headset, and OEM panels that send keys instead of session
-  /// commands). Play/pause follows the player's own state, not the last
-  /// published one, so a key can't be read the wrong way round.
+  /// Media keys (headset, and system panels that send keys instead of
+  /// session commands). Play/pause follows the player's own state, not the
+  /// last published one, so a key can't be read the wrong way round.
   @override
   Future<void> click([MediaButton button = MediaButton.media]) async {
-    _log('media key: ${button.name}');
     switch (button) {
       case MediaButton.media:
         return _player.playing ? pause() : play();
@@ -549,22 +532,13 @@ class AudioPlayerHandler extends BaseAudioHandler {
   }
 
   @override
-  Future<void> seek(Duration position) {
-    _log('seek to ${position.inSeconds}s');
-    return _player.seek(position);
-  }
+  Future<void> seek(Duration position) => _player.seek(position);
 
   @override
-  Future<void> fastForward() {
-    _log('forward');
-    return _seekBy(_settings.seekInterval);
-  }
+  Future<void> fastForward() => _seekBy(_settings.seekInterval);
 
   @override
-  Future<void> rewind() {
-    _log('back');
-    return _seekBy(-_settings.seekInterval);
-  }
+  Future<void> rewind() => _seekBy(-_settings.seekInterval);
 
   Future<void> _seekBy(Duration offset) async {
     final duration = _player.duration ?? Duration.zero;
@@ -601,7 +575,6 @@ class AudioPlayerHandler extends BaseAudioHandler {
 
   @override
   Future<void> stop() async {
-    _log('stop');
     _playIntent = false;
     _saveLastSong();
     await _player.stop();

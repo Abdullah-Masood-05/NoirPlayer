@@ -3,6 +3,19 @@
 Release notes for Noir Player. Each `## [x.y.z] - Title` section becomes the
 notes of the matching GitHub release.
 
+## [2.0.1] - Lock screen and media panel controls fixed
+
+### 🔒 Lock screen & system media controls
+- **Play, pause, next and previous now work from the lock screen and from the expanded Media player** (the pop-up you get from the quick-settings media card). On OnePlus phones these buttons did nothing and showed three loading dots instead; seeking was the only thing that worked.
+
+### 🛠️ What was wrong and what changed
+- **The buttons were sent to a part of the app that didn't exist.** When you press a button in the media notification, Android hands it to a small receiver that the app has to declare. Noir Player declared the wrong one, so every press from the lock screen and the Media player was quietly dropped. Stock Android's own controls send these commands another way, which is why the regular notification and in-app buttons always worked. Noir Player now declares the right receiver.
+- **Presses go straight to the playing music.** Even once delivered, a press could be lost: the background audio library restarted its service to handle it, and Android 12 and newer can refuse that while the app is in the background. Noir Player now uses a patched copy of that library that passes the press directly to the music already playing.
+- **Play uses the standard play key.** The library sent Play as a special key that OnePlus, Oppo and Vivo system controls drop. It now sends the normal play key, and Noir Player checks whether music is actually playing before deciding to play or pause.
+
+### 📦 Installing
+- **2.0.1 updates over 2.0.0 in place.** Your playlists and settings stay as they are.
+
 ## [2.0.0] - Faster everywhere, Up next and quick play
 
 ### ⚡ Faster
