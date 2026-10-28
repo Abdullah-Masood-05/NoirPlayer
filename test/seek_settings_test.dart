@@ -168,14 +168,20 @@ void main() {
     expect(formatVersionLabel('', ''), 'Version unknown');
   });
 
-  test('seek buttons show the seconds for 5, 10 and 30 s', () {
-    expect(seekIconResource(10, forward: false), 'drawable/noir_seek_back_10');
-    expect(
-      seekIconResource(30, forward: true),
-      'drawable/noir_seek_forward_30',
-    );
-    expect(seekIconResource(5, forward: true), 'drawable/noir_seek_forward_5');
-    expect(seekIconResource(15, forward: false), 'drawable/noir_seek_back');
-    expect(seekIconResource(60, forward: true), 'drawable/noir_seek_forward');
+  test('every button uses Noir Player\'s own icons', () {
+    for (final playing in [true, false]) {
+      final spec = buildMediaControls(
+        playing: playing,
+        showSeek: true,
+        seekSeconds: 10,
+      );
+      expect(spec.controls.map((c) => c.androidIcon), [
+        'drawable/noir_media_previous',
+        'drawable/noir_seek_back',
+        playing ? 'drawable/noir_media_pause' : 'drawable/noir_media_play',
+        'drawable/noir_seek_forward',
+        'drawable/noir_media_next',
+      ]);
+    }
   });
 }
