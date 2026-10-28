@@ -30,7 +30,9 @@ Future<AudioPlayerHandler> initAudioService(ProviderContainer container) {
       // the app frozen / unable to play when reopened from recents.
       androidNotificationOngoing: true,
       androidShowNotificationBadge: true,
-      androidNotificationIcon: 'mipmap/ic_launcher',
+      // Monochrome mark: small notification icons are drawn as a silhouette,
+      // so the full-colour launcher icon showed as a blob.
+      androidNotificationIcon: 'drawable/ic_stat_noir',
       // The seek step comes from Settings. AudioPlayerHandler overrides
       // fastForward / rewind to read it live; this only seeds the iOS
       // lock-screen skip buttons, which pick it up on the next launch.
