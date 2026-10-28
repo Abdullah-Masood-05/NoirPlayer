@@ -38,29 +38,30 @@ class MediaControlsSpec {
 /// next buttons into skip-back / skip-forward buttons, so they are only
 /// enabled with [showSeek].
 ///
-/// The seek buttons use Noir Player's own icons (a circular arrow with the
-/// seconds inside for 5, 10 and 30 s, like most players' lock screens).
+/// Every button uses Noir Player's own icons in the Material Symbols Rounded
+/// style (filled previous / play / pause / next, plain circular arrows for
+/// seeking), as OEM lock screens draw the notification's own icons.
 MediaControlsSpec buildMediaControls({
   required bool playing,
   required bool showSeek,
   required int seekSeconds,
 }) {
   final controls = <MediaControl>[
-    MediaControl.skipToPrevious,
+    previousControl,
     if (showSeek)
       MediaControl(
-        androidIcon: seekIconResource(seekSeconds, forward: false),
+        androidIcon: 'drawable/noir_seek_back',
         label: 'Back $seekSeconds seconds',
         action: MediaAction.rewind,
       ),
-    if (playing) MediaControl.pause else MediaControl.play,
+    if (playing) pauseControl else playControl,
     if (showSeek)
       MediaControl(
-        androidIcon: seekIconResource(seekSeconds, forward: true),
+        androidIcon: 'drawable/noir_seek_forward',
         label: 'Forward $seekSeconds seconds',
         action: MediaAction.fastForward,
       ),
-    MediaControl.skipToNext,
+    nextControl,
   ];
 
   return MediaControlsSpec(
@@ -83,11 +84,26 @@ MediaControlsSpec buildMediaControls({
   );
 }
 
-/// Android drawable for a seek button: one showing the seconds for 5, 10 and
-/// 30 s, a plain circular arrow otherwise.
-String seekIconResource(int seconds, {required bool forward}) {
-  final direction = forward ? 'forward' : 'back';
-  return const [5, 10, 30].contains(seconds)
-      ? 'drawable/noir_seek_${direction}_$seconds'
-      : 'drawable/noir_seek_$direction';
-}
+const previousControl = MediaControl(
+  androidIcon: 'drawable/noir_media_previous',
+  label: 'Previous',
+  action: MediaAction.skipToPrevious,
+);
+
+const playControl = MediaControl(
+  androidIcon: 'drawable/noir_media_play',
+  label: 'Play',
+  action: MediaAction.play,
+);
+
+const pauseControl = MediaControl(
+  androidIcon: 'drawable/noir_media_pause',
+  label: 'Pause',
+  action: MediaAction.pause,
+);
+
+const nextControl = MediaControl(
+  androidIcon: 'drawable/noir_media_next',
+  label: 'Next',
+  action: MediaAction.skipToNext,
+);
