@@ -9,7 +9,7 @@ notes of the matching GitHub release.
 - **Play, pause, next and previous now work from the lock screen and from the expanded Media player** (the pop-up you get from the quick-settings media card). On OnePlus phones these buttons did nothing and showed three loading dots instead; seeking was the only thing that worked.
 
 - **Back and forward buttons on the lock screen**, like other music players: circular arrows beside play skip back and forward by your seek interval. They're on by default; turn them off in Settings → **Seek buttons on lock screen**. Some phones only show them when the player is expanded.
-- **Modern lock-screen buttons:** previous, play / pause, next and the seek arrows use the same rounded style as the rest of Android, instead of the old bold icons.
+- **Modern lock-screen buttons:** previous, play / pause, next and the seek arrows use the same rounded style as the rest of Android, instead of the old bold icons, and are a little larger so they're easier to tap.
 - **A proper Noir Player icon** in the status bar, notification and lock-screen player header, instead of a blurred square.
 
 ### 🛠️ What was wrong and what changed
