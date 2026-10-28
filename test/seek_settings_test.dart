@@ -46,11 +46,8 @@ void main() {
       expect(spec.compactIndices, [0, 2, 4]);
       expect(spec.controls[1].label, 'Back 15 seconds');
       expect(spec.controls[3].label, 'Forward 15 seconds');
-      expect(spec.controls[1].androidIcon, MediaControl.rewind.androidIcon);
-      expect(
-        spec.controls[3].androidIcon,
-        MediaControl.fastForward.androidIcon,
-      );
+      expect(spec.controls[1].androidIcon, 'drawable/noir_seek_back');
+      expect(spec.controls[3].androidIcon, 'drawable/noir_seek_forward');
       // Standard controls: audio_service turns these into session custom
       // actions on Android 13+ and notification actions on older versions.
       expect(spec.controls.every((c) => c.customAction == null), isTrue);
@@ -146,9 +143,7 @@ void main() {
     test('presets include 5, 10 and 15 seconds and are all valid', () {
       expect(AppSettings.seekIntervalPresets, containsAll([5, 10, 15]));
       expect(
-        AppSettings.seekIntervalPresets.every(
-          AppSettings.isValidSeekInterval,
-        ),
+        AppSettings.seekIntervalPresets.every(AppSettings.isValidSeekInterval),
         isTrue,
       );
     });
@@ -171,5 +166,16 @@ void main() {
     expect(formatVersionLabel('1.2.0', '1.2.0'), 'Version 1.2.0');
     expect(formatVersionLabel('', '6'), 'Build 6');
     expect(formatVersionLabel('', ''), 'Version unknown');
+  });
+
+  test('seek buttons show the seconds for 5, 10 and 30 s', () {
+    expect(seekIconResource(10, forward: false), 'drawable/noir_seek_back_10');
+    expect(
+      seekIconResource(30, forward: true),
+      'drawable/noir_seek_forward_30',
+    );
+    expect(seekIconResource(5, forward: true), 'drawable/noir_seek_forward_5');
+    expect(seekIconResource(15, forward: false), 'drawable/noir_seek_back');
+    expect(seekIconResource(60, forward: true), 'drawable/noir_seek_forward');
   });
 }

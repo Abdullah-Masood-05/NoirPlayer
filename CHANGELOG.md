@@ -3,10 +3,12 @@
 Release notes for Noir Player. Each `## [x.y.z] - Title` section becomes the
 notes of the matching GitHub release.
 
-## [2.0.1] - Lock screen and media panel controls fixed
+## [2.0.1] - Lock screen controls fixed, seek buttons added
 
 ### 🔒 Lock screen & system media controls
 - **Play, pause, next and previous now work from the lock screen and from the expanded Media player** (the pop-up you get from the quick-settings media card). On OnePlus phones these buttons did nothing and showed three loading dots instead; seeking was the only thing that worked.
+
+- **Back and forward buttons on the lock screen**, like other music players: ⟲10 and ⟳10 sit beside play (showing your seek interval for 5, 10 and 30 seconds, a plain arrow otherwise). They're on by default; turn them off in Settings → **Seek buttons on lock screen**. Some phones only show them when the player is expanded.
 
 ### 🛠️ What was wrong and what changed
 - **The buttons were sent to a part of the app that didn't exist.** When you press a button in the media notification, Android hands it to a small receiver that the app has to declare. Noir Player declared the wrong one, so every press from the lock screen and the Media player was quietly dropped. Stock Android's own controls send these commands another way, which is why the regular notification and in-app buttons always worked. Noir Player now declares the right receiver.
