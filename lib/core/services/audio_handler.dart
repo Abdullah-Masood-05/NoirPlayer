@@ -516,6 +516,21 @@ class AudioPlayerHandler extends BaseAudioHandler {
     return _player.pause();
   }
 
+  /// Media keys (headset, and system panels that send keys instead of
+  /// session commands). Play/pause follows the player's own state, not the
+  /// last published one, so a key can't be read the wrong way round.
+  @override
+  Future<void> click([MediaButton button = MediaButton.media]) async {
+    switch (button) {
+      case MediaButton.media:
+        return _player.playing ? pause() : play();
+      case MediaButton.next:
+        return skipToNext();
+      case MediaButton.previous:
+        return skipToPrevious();
+    }
+  }
+
   @override
   Future<void> seek(Duration position) => _player.seek(position);
 
